@@ -1,0 +1,5 @@
+ursina
+ultralytics
+opencv-python
+numpy
+panda3d-gltf

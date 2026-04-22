@@ -1,0 +1,32 @@
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment files
+.env
+
+# Logs
+logs/
+*.log
+
+# YOLO weight file
+yolov8n.pt
+*.pt
+
+# Temporary capture outputs
+assets/captures/
+assets/captures/yolo_output/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Optional local test/cache files
+*.tmp
