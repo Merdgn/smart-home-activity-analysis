@@ -1192,7 +1192,7 @@ living_table = load_static_model(
     position=(-5.0, 0.0, 4.6),
     rotation=(0, 0, 0),
     target_size=1.3,
-    tint=color.rgb(110, 85, 60)
+    tint=color.hex("#D8B08C")
 )
 
 living_lamp_entity = load_static_model(
@@ -1249,17 +1249,9 @@ bed_single = load_static_model(
     tint=color.rgb(205, 200, 190)
 )
 
-nightstand_left = load_static_model(
-    'NightStand_1',
-    position=(5.5, 0.0, 5.0),
-    rotation=(0, 180, 0),
-    target_size=1.0,
-    tint=color.rgb(110, 80, 55)
-)
-
 nightstand_right = load_static_model(
     'NightStand_2',
-    position=(8.8, 0.0, 5.0),
+    position=(9.3, 0.0, 5.0),
     rotation=(0, 180, 0),
     target_size=1.0,
     tint=color.rgb(110, 80, 55)
@@ -1267,18 +1259,10 @@ nightstand_right = load_static_model(
 
 bedroom_drawer = load_static_model(
     'Drawer_2',
-    position=(9.7, 0.0, 7.2),
+    position=(10.3, 0.0, 8.0),
     rotation=(0, 270, 0),
     target_size=1.5,
     tint=color.rgb(120, 88, 60)
-)
-
-bedroom_plant = load_static_model(
-    'Houseplant_2',
-    position=(4.5, 0.0, 7.0),
-    rotation=(0, 0, 0),
-    target_size=1.4,
-    tint=color.rgb(90, 150, 90)
 )
 
 
@@ -1292,9 +1276,9 @@ bedroom_plant_2 = load_static_model(
 
 bedroom_floor_lamp = load_static_model(
     'Light_Stand2',
-    position=(9.6, 0.0, 4.0),
+    position=(10.4, 0.0, 4.0),
     rotation=(0, 0, 0),
-    target_size=1.35,
+    target_size=1.85,
     tint=color.rgb(220, 200, 140)
 )
 
@@ -1321,8 +1305,8 @@ bath_mirror = load_static_model(
 
 bath_toilet = load_static_model(
     'Bathroom_Toilet',
-    position=(8.8, 0.0, -3.0),
-    rotation=(0, 180, 0),
+    position=(9.5, 0.0, -3.8),
+    rotation=(0, 90, 0),
     target_size=1.5,
     tint=color.rgb(200, 210, 215)
 )
@@ -1401,8 +1385,10 @@ fridge = load_static_model(
     position=(-9.85, 0.0, -2.15),
     rotation=(0, 0, 0),
     target_size=3.0,
-    tint=color.rgb(95, 105, 110)
+    # Daha tok ve koyu bir füme/gri tonu:
+    tint=color.hex("#591C21")   
 )
+fridge.texture = None
 
 kitchen_sink_model = load_static_model(
     'Kitchen_Sink',
@@ -1460,9 +1446,11 @@ kitchen_table = load_static_model(
     'Table_RoundSmall',
     position=(-6.65, 0.0, -2.75),
     rotation=(0, 0, 0),
-    target_size=1.20,
-    tint=color.rgb(120, 85, 55)
+    target_size=2.0,
+    tint=color.hex("#D8B08C")
 )
+
+kitchen_table.texture = None
 
 # outlet / toaster / coffee machine are placeholders because this pack does not clearly include direct models
 
@@ -1825,7 +1813,7 @@ seat_points = [
         'rotation_y': 90,
         'seat_type': 'couch',
         'occupied_by': None,
-        'offset': Vec3(0.0, 0.58, 0.0),
+        'offset': Vec3(-0.35, 0.58, 0.0),
     },
     {
         'name': 'Small Couch Right',
@@ -1833,43 +1821,43 @@ seat_points = [
         'rotation_y': 90,
         'seat_type': 'couch',
         'occupied_by': None,
-        'offset': Vec3(0.0, 0.58, 0.0),
+        'offset': Vec3(-0.35, 0.58, 0.0),
     },
 
-    # --- Couch_Large2 (-5.1, 2.5, rot=180) ---
+    # --- Couch_Large2 (-4.7, 1.8, rot=180) ---
     {
         'name': 'Large Couch Left',
-        'position': Vec3(-6.1, 0.0, 2.5),
+        'position': Vec3(-5.7, 0.0, 1.8),
         'rotation_y': 180,
         'seat_type': 'couch',
         'occupied_by': None,
-        'offset': Vec3(0.0, 0.58, 0.0),
+        'offset': Vec3(0.0, 0.58, -0.35),
     },
     {
         'name': 'Large Couch Center',
-        'position': Vec3(-5.1, 0.0, 2.5),
+        'position': Vec3(-4.7, 0.0, 1.8),
         'rotation_y': 180,
         'seat_type': 'couch',
         'occupied_by': None,
-        'offset': Vec3(0.0, 0.58, 0.0),
+        'offset': Vec3(0.0, 0.58, -0.35),
     },
     {
         'name': 'Large Couch Right',
-        'position': Vec3(-4.1, 0.0, 2.5),
+        'position': Vec3(-3.7, 0.0, 1.8),
         'rotation_y': 180,
         'seat_type': 'couch',
         'occupied_by': None,
-        'offset': Vec3(0.0, 0.58, 0.0),
+        'offset': Vec3(0.0, 0.58, -0.35),
     },
 
     # --- Bathroom Toilet ---
     {
         'name': 'Bathroom Toilet',
-        'position': Vec3(8.8, 0.0, -3.0),
-        'rotation_y': 180,
+        'position': Vec3(9.5, 0.0, -3.8),
+        'rotation_y': 90,
         'seat_type': 'toilet',
         'occupied_by': None,
-        'offset': Vec3(0.00, 0.92, -0.22),
+        'offset': Vec3(-0.42, 0.92, -0.65),
     },
 ]
 
