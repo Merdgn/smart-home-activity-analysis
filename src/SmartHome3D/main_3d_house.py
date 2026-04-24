@@ -100,6 +100,8 @@ last_move_log_pos_b = None
 
 active_actor_id = 'A'
 
+last_controlled_actor = 'A'
+
 
 is_lying_a = False
 is_lying_b = False
@@ -1162,7 +1164,7 @@ HIGHLIGHT_INDICATOR_SCALE = 0.22
 
 living_carpet = load_static_model(
     'Carpet_Round',
-    position=(-7.0, 0.01, 4.5),
+    position=(-5.0, 0.01, 4.5),
     rotation=(0, 0, 0),
     target_size=3.2,
     tint=color.rgb(140, 80, 70)
@@ -1176,9 +1178,18 @@ living_couch = load_static_model(
     tint=color.rgb(120, 95, 80)
 )
 
+living_couch_2 = load_static_model(
+    'Couch_Large2',
+    position=(-4.7, 0.0, 1.8),
+    rotation=(0, 180, 0),
+    target_size=3.2,
+    tint=color.rgb(125, 100, 85)
+)
+
+
 living_table = load_static_model(
     'Table_RoundSmall',
-    position=(-6.8, 0.0, 4.6),
+    position=(-5.0, 0.0, 4.6),
     rotation=(0, 0, 0),
     target_size=1.3,
     tint=color.rgb(110, 85, 60)
@@ -1200,6 +1211,24 @@ living_window = load_static_model(
     tint=color.rgb(180, 205, 220)
 )
 
+
+living_plant = load_static_model(
+    'Houseplant_1',
+    position=(-5.2, 0.0, 7.8),
+    rotation=(0, 270, 0),
+    target_size=1.3,
+    tint=color.rgb(80, 145, 85)
+)
+
+living_shelf = load_static_model(
+    'Shelf_Large',
+    position=(-10.5, 0.0, 1.5),
+    rotation=(0, 90, 0),
+    target_size=2.2,
+    tint=color.rgb(120, 85, 55)
+)
+
+
 # --------------------------------------------------
 # BEDROOM OBJECTS
 # --------------------------------------------------
@@ -1210,6 +1239,14 @@ bed = load_static_model(
     rotation=(0, 180, 0),
     target_size=3.2,
     tint=color.rgb(210, 205, 195)
+)
+
+bed_single = load_static_model(
+    'Bed_Single',
+    position=(4.9, 0.0, 5.7),
+    rotation=(0, 180, 0),
+    target_size=2.3,
+    tint=color.rgb(205, 200, 190)
 )
 
 nightstand_left = load_static_model(
@@ -1244,41 +1281,58 @@ bedroom_plant = load_static_model(
     tint=color.rgb(90, 150, 90)
 )
 
+
+bedroom_plant_2 = load_static_model(
+    'Houseplant_3',
+    position=(4.1, 0.0, 7.7),
+    rotation=(0, 0, 0),
+    target_size=1.25,
+    tint=color.rgb(80, 145, 85)
+)
+
+bedroom_floor_lamp = load_static_model(
+    'Light_Stand2',
+    position=(9.6, 0.0, 4.0),
+    rotation=(0, 0, 0),
+    target_size=1.35,
+    tint=color.rgb(220, 200, 140)
+)
+
+
 # --------------------------------------------------
 # BATHROOM OBJECTS
 # --------------------------------------------------
 
-# Banyo - şu an çok açık/beyaz görünüyor, tint'i daha belirgin yap
 bath_sink = load_static_model(
     'Bathroom_Sink',
-    position=(5.3, 0.0, -2.2),
-    rotation=(0, 180, 0),
-    target_size=1.4,
-    tint=color.rgb(180, 195, 200)  # ← biraz daha mavi-gri
+    position=(6.3, 0.0, -1.2),
+    rotation=(0, 0, 0),
+    target_size=1.6,
+    tint=color.rgb(180, 195, 200)
 )
 
 bath_mirror = load_static_model(
     'Bathroom_Mirror1',
-    position=(5.3, 1.8, -3.4),
-    rotation=(0, 180, 0),
-    target_size=1.7,
-    tint=color.rgb(140, 165, 180)  # ← daha belirgin mavi-gümüş
+    position=(6.3, 1.9, -1.2),
+    rotation=(0, 0, 0),
+    target_size=1.9,
+    tint=color.rgb(140, 165, 180)
 )
 
 bath_toilet = load_static_model(
     'Bathroom_Toilet',
-    position=(8.2, 0.0, -2.3),
+    position=(8.8, 0.0, -3.0),
     rotation=(0, 180, 0),
-    target_size=1.35,
-    tint=color.rgb(200, 210, 215)  # ← hafif mavi-beyaz
+    target_size=1.5,
+    tint=color.rgb(200, 210, 215)
 )
 
 bath_shower = load_static_model(
     'Bathroom_Shower1',
-    position=(9.2, 0.0, -6.2),
+    position=(9.5, 0.0, -6.8),
     rotation=(0, 180, 0),
-    target_size=2.2,
-    tint=color.rgb(120, 155, 175)   # ← daha koyu mavi-gri, cam hissi
+    target_size=2.4,
+    tint=color.rgb(120, 155, 175)
 )
 
 bath_washer = load_static_model(
@@ -1289,6 +1343,38 @@ bath_washer = load_static_model(
     tint=color.rgb(200, 205, 215)  # ← beyaz makine
 )
 
+bath_towel = load_static_model(
+    'Bathroom_Towel',
+    position=(10.6, 1.4, -4.8),
+    rotation=(0, 270, 0),
+    target_size=1.4,
+    tint=color.rgb(80, 170, 230)
+)
+
+bath_toilet_paper_pile = load_static_model(
+    'Bathroom_ToiletPaperPile',
+    position=(9.3, 0.7, -0.4),
+    rotation=(0, 0, 0),
+    target_size=0.8,
+    tint=color.rgb(245, 245, 245)
+)
+
+bath_trashcan = load_static_model(
+    'Trashcan_Cylindric',
+    position=(10.3, 0.3, -0.2),
+    rotation=(0, 0, 0),
+    target_size=0.9,
+    tint=color.rgb(45, 45, 45)
+)
+
+bath_bathtub = load_static_model(
+    'Bathroom_Bathtub',
+    position=(4.0, 0.0, -1.0),
+    rotation=(0, 180, 0),
+    target_size=2.6,
+    tint=color.rgb(210, 220, 225)
+)
+
 # --------------------------------------------------
 # KITCHEN OBJECTS
 # --------------------------------------------------
@@ -1297,7 +1383,8 @@ kitchen_counter = Entity(
     model='cube',
     position=(-5.0, 0.45, -7.25),
     scale=(7.9, 0.90, 1.15),
-    color=color.rgb(188, 188, 196)
+    color=color.rgb(188, 188, 196),
+    collider='box'
 )
 
 kitchen_back_splash = Entity(
@@ -1307,29 +1394,50 @@ kitchen_back_splash = Entity(
     color=color.rgb(228, 228, 232)
 )
 
+# SOL TARAFTA GÖRÜNÜR BUZDOLABI
+
 fridge = load_static_model(
     'Kitchen_Fridge',
-    position=(-9.4, 0.0, -7.2),
-    rotation=(0, 180, 0),
-    target_size=2.6,
-    tint=color.rgb(190, 190, 195)
+    position=(-9.85, 0.0, -2.15),
+    rotation=(0, 0, 0),
+    target_size=3.0,
+    tint=color.rgb(95, 105, 110)
 )
 
 kitchen_sink_model = load_static_model(
     'Kitchen_Sink',
-    position=(-5.6, 0.86, -7.25),
+    position=(-8.65, 0.88, -7.25),
     rotation=(0, 180, 0),
-    target_size=1.4,
+    target_size=1.25,
     tint=color.rgb(170, 180, 185)
 )
 
-# Mutfak - daha sıcak ahşap tonları
+# GÖRÜNÜR OCAK
+kitchen_stove_top = Entity(
+    model='cube',
+    position=(-7.45, 0.93, -7.23),
+    scale=(1.05, 0.035, 0.72),
+    color=color.rgb(20, 20, 22),
+    collider='box'
+)
+
+for sx in [-0.28, 0.28]:
+    for sz in [-0.18, 0.18]:
+        Entity(
+            parent=kitchen_stove_top,
+            model='torus',
+            position=(sx, 0.04, sz),
+            rotation=(90, 0, 0),
+            scale=0.17,
+            color=color.rgb(230, 230, 230)
+        )
+
 kitchen_cabinet = load_static_model(
     'Kitchen_Cabinet1',
-    position=(-7.4, 0.0, -7.25),
+    position=(-6.2, 0.0, -7.25),
     rotation=(0, 180, 0),
-    target_size=1.7,
-    tint=color.rgb(160, 115, 70)   # ← daha belirgin ahşap
+    target_size=1.55,
+    tint=color.rgb(160, 115, 70)
 )
 
 kitchen_drawers = load_static_model(
@@ -1337,7 +1445,7 @@ kitchen_drawers = load_static_model(
     position=(-4.2, 0.0, -7.25),
     rotation=(0, 180, 0),
     target_size=1.5,
-    tint=color.rgb(175, 130, 80)   # ← daha sıcak
+    tint=color.rgb(175, 130, 80)
 )
 
 kitchen_oven_model = load_static_model(
@@ -1345,7 +1453,15 @@ kitchen_oven_model = load_static_model(
     position=(-2.3, 0.0, -7.25),
     rotation=(0, 180, 0),
     target_size=2.0,
-    tint=color.rgb(55, 55, 60)     # ← daha koyu antrasit
+    tint=color.rgb(55, 55, 60)
+)
+
+kitchen_table = load_static_model(
+    'Table_RoundSmall',
+    position=(-6.65, 0.0, -2.75),
+    rotation=(0, 0, 0),
+    target_size=1.20,
+    tint=color.rgb(120, 85, 55)
 )
 
 # outlet / toaster / coffee machine are placeholders because this pack does not clearly include direct models
@@ -1373,6 +1489,38 @@ coffee_machine_entity = make_placeholder_box(
     color_value=color.rgb(45, 45, 45)
 )
 Entity(parent=coffee_machine_entity, model='cube', position=(0, -0.18, 0.14), scale=(0.18, 0.14, 0.08), color=color.rgb(220, 220, 220))
+
+kitchen_plate = load_static_model(
+    'Plate_1',
+    position=(-5.15, 1.37, -7.05),
+    rotation=(0, 0, 0),
+    target_size=0.55,
+    tint=color.rgb(240, 235, 220)
+)
+
+kitchen_spoon = load_static_model(
+    'Spoon',
+    position=(-4.80, 1.39, -7.15),
+    rotation=(0, 35, 0),
+    target_size=0.48,
+    tint=color.rgb(185, 185, 180)
+)
+
+kitchen_fork = load_static_model(
+    'Fork',
+    position=(-4.52, 1.39, -7.05),
+    rotation=(0, -25, 0),
+    target_size=0.48,
+    tint=color.rgb(185, 185, 180)
+)
+
+kitchen_knife = load_static_model(
+    'Knife',
+    position=(-4.22, 1.39, -7.05),
+    rotation=(0, 10, 0),
+    target_size=0.48,
+    tint=color.rgb(165, 165, 165)
+)
 
 # --------------------------------------------------
 # FRONT DOOR
@@ -1416,6 +1564,7 @@ bathroom_hall_door = load_static_model(
     parent=bathroom_hall_pivot,
     tint=color.rgb(175, 120, 65)
 )
+
 
 bedroom_door = AnimatedDoor('Bedroom Door', bedroom_hall_pivot, bedroom_hall_door)
 bathroom_door = AnimatedDoor('Bathroom Door', bathroom_hall_pivot, bathroom_hall_door)
@@ -1582,11 +1731,10 @@ oven_device = SmartDevice(
 sink_device = SmartDevice(
     name='Bathroom Sink',
     entity=bath_sink,
-    state_off='IDLE',
-    state_on='WASHING',
-    indicator_offset=(0, 1.05, 0),
-    indicator_scale=0.10,
-    indicator_on=color.azure,
+    indicator_offset=(0, 1.1, 0),
+    indicator_scale=0.12,
+    indicator_off=color.orange, # Kapalıyken Turuncu (daha belirgin)
+    indicator_on=color.azure,    # Açıkken Mavi
     on_turn_on=sink_on,
     on_turn_off=sink_off
 )
@@ -1670,48 +1818,85 @@ def build_scenario_4():
 # --------------------------------------------------
 
 seat_points = [
+    # --- Couch_Small2 (-8.8, 5.3, rot=90) ---
     {
-        'name': 'Living Couch Left',
-        'position': Vec3(-9.00, 0.0, 4.20),
+        'name': 'Small Couch Left',
+        'position': Vec3(-8.8, 0.0, 5.65),
         'rotation_y': 90,
         'seat_type': 'couch',
         'occupied_by': None,
-        'y_offset': 0.64,
+        'offset': Vec3(0.0, 0.58, 0.0),
     },
     {
-        'name': 'Living Couch Right',
-        'position': Vec3(-8.20, 0.0, 4.20),
+        'name': 'Small Couch Right',
+        'position': Vec3(-8.8, 0.0, 4.95),
         'rotation_y': 90,
         'seat_type': 'couch',
         'occupied_by': None,
-        'y_offset': 0.64,
+        'offset': Vec3(0.0, 0.58, 0.0),
     },
+
+    # --- Couch_Large2 (-5.1, 2.5, rot=180) ---
+    {
+        'name': 'Large Couch Left',
+        'position': Vec3(-6.1, 0.0, 2.5),
+        'rotation_y': 180,
+        'seat_type': 'couch',
+        'occupied_by': None,
+        'offset': Vec3(0.0, 0.58, 0.0),
+    },
+    {
+        'name': 'Large Couch Center',
+        'position': Vec3(-5.1, 0.0, 2.5),
+        'rotation_y': 180,
+        'seat_type': 'couch',
+        'occupied_by': None,
+        'offset': Vec3(0.0, 0.58, 0.0),
+    },
+    {
+        'name': 'Large Couch Right',
+        'position': Vec3(-4.1, 0.0, 2.5),
+        'rotation_y': 180,
+        'seat_type': 'couch',
+        'occupied_by': None,
+        'offset': Vec3(0.0, 0.58, 0.0),
+    },
+
+    # --- Bathroom Toilet ---
     {
         'name': 'Bathroom Toilet',
-        'position': Vec3(8.15, 0.0, -2.25),
+        'position': Vec3(8.8, 0.0, -3.0),
         'rotation_y': 180,
         'seat_type': 'toilet',
         'occupied_by': None,
-        'y_offset': 0.52,
+        'offset': Vec3(0.00, 0.92, -0.22),
     },
 ]
 
 bed_points = [
     {
-        'name': 'Bed Left',
-        'position': Vec3(6.95, 0.0, 5.55),
+        'name': 'King Bed Left',
+        'position': Vec3(6.55, 0.0, 5.55),
         'rotation_y': 90,
         'occupied_by': None,
-        'y_offset': 1.20,
+        'offset': Vec3(-0.10, 1.55, 0.00),
         'stand_position': Vec3(5.35, 0.85, 5.35),
     },
     {
-        'name': 'Bed Right',
-        'position': Vec3(7.85, 0.0, 5.55),
+        'name': 'King Bed Right',
+        'position': Vec3(7.65, 0.0, 5.55),
         'rotation_y': 90,
         'occupied_by': None,
-        'y_offset': 1.20,
+        'offset': Vec3(0.10, 1.55, 0.00),
         'stand_position': Vec3(8.95, 0.85, 5.35),
+    },
+    {
+        'name': 'Single Bed',
+        'position': Vec3(4.75, 0.0, 5.65),
+        'rotation_y': 90,
+        'occupied_by': None,
+        'offset': Vec3(0.00, 1.20, 0.00),
+        'stand_position': Vec3(3.85, 0.85, 5.20),
     },
 ]
 
@@ -1905,16 +2090,13 @@ def sit_actor(actor_id):
             push_notification('A: No seat nearby')
             return
 
-        player_a.position = Vec3(
-    nearest_seat['position'].x,
-    nearest_seat.get('y_offset', 0.45),
-    nearest_seat['position'].z
-)
-        megan_root.position = Vec3(
-            nearest_seat['position'].x,
-            nearest_seat.get('y_offset', 0.45),
-            nearest_seat['position'].z
-)
+        seat_base = nearest_seat['position']
+        seat_offset = nearest_seat.get('offset', Vec3(0, 0.45, 0))
+        final_pos = seat_base + seat_offset
+
+        player_a.position = final_pos
+        megan_root.position = final_pos
+        player_a.y = final_pos.y
         megan_root.rotation_y = nearest_seat['rotation_y']
 
         play_actor_anim(megan, 'sit_down', loop=False)
@@ -1943,16 +2125,13 @@ def sit_actor(actor_id):
             push_notification('B: No seat nearby')
             return
 
-        player_b.position = Vec3(
-    nearest_seat['position'].x,
-    nearest_seat.get('y_offset', 0.45),
-    nearest_seat['position'].z
-)
-        sophie_root.position = Vec3(
-            nearest_seat['position'].x,
-            nearest_seat.get('y_offset', 0.45),
-            nearest_seat['position'].z
-)
+        seat_base = nearest_seat['position']
+        seat_offset = nearest_seat.get('offset', Vec3(0, 0.45, 0))
+        final_pos = seat_base + seat_offset
+
+        player_b.position = final_pos
+        sophie_root.position = final_pos
+        player_b.y = final_pos.y
         sophie_root.rotation_y = nearest_seat['rotation_y']
 
         play_actor_anim(sophie, 'sit_down', loop=False)
@@ -1971,7 +2150,6 @@ def sit_actor(actor_id):
             actor_entity=player_b,
             room_name_override=current_room_b
         )
-
 
 def stand_actor(actor_id):
     global is_seated_a, is_seated_b
@@ -2020,20 +2198,31 @@ def stand_actor(actor_id):
             room_name_override=current_room_b
         )
 
-def get_nearest_bed_for(actor_entity, actor_id, max_distance=4.8):
-    nearest = None
-    nearest_dist = 9999.0
+def get_nearest_bed_for(actor_entity, actor_id, max_distance=6.0):
+    candidates = []
 
     for bed_point in bed_points:
         if bed_point['occupied_by'] not in (None, actor_id):
             continue
 
-        dist = distance(actor_entity.position, bed_point['position'])
-        if dist < nearest_dist and dist <= max_distance:
-            nearest = bed_point
-            nearest_dist = dist
+        # Megan sadece büyük yatağı kullansın
+        if actor_id == 'A' and 'King Bed' not in bed_point['name']:
+            continue
 
-    return nearest, nearest_dist
+        # Sophie sadece tek kişilik yatağı kullansın
+        if actor_id == 'B' and 'Single Bed' not in bed_point['name']:
+            continue
+
+        dist = distance(actor_entity.position, bed_point['position'])
+        if dist <= max_distance:
+            candidates.append((bed_point, dist))
+
+    if not candidates:
+        return None, 9999.0
+
+    candidates.sort(key=lambda x: x[1])
+    return candidates[0]
+
 
 def lie_actor(actor_id):
     global is_lying_a, is_lying_b
@@ -2053,17 +2242,12 @@ def lie_actor(actor_id):
 
     nearest_bed['occupied_by'] = actor_id
 
-    actor_entity.position = Vec3(
-        nearest_bed['position'].x,
-        nearest_bed.get('y_offset', 1.18),
-        nearest_bed['position'].z
-)
+    bed_base = nearest_bed['position']
+    bed_offset = nearest_bed.get('offset', Vec3(0, 1.18, 0))
+    final_pos = bed_base + bed_offset
 
-    actor_root.position = Vec3(
-        nearest_bed['position'].x,
-        nearest_bed.get('y_offset', 1.18),
-        nearest_bed['position'].z
-)
+    actor_entity.position = final_pos
+    actor_root.position = final_pos
     actor_root.rotation_y = nearest_bed['rotation_y']
 
         # lying animasyonu yatağın eksenine daha iyi otursun
@@ -2141,6 +2325,39 @@ def get_up_actor(actor_id):
         room_name_override=get_room_name(actor_entity.position)
     )
 
+def get_action_actor():
+    return active_actor_id
+
+def handle_shared_sit_stand():
+    actor_id = get_action_actor()
+
+    if actor_id == 'A':
+        if is_seated_a:
+            stand_actor('A')
+        else:
+            sit_actor('A')
+
+    elif actor_id == 'B':
+        if is_seated_b:
+            stand_actor('B')
+        else:
+            sit_actor('B')
+
+
+def handle_shared_lie_getup():
+    actor_id = get_action_actor()
+
+    if actor_id == 'A':
+        if is_lying_a:
+            get_up_actor('A')
+        else:
+            lie_actor('A')
+    else:
+        if is_lying_b:
+            get_up_actor('B')
+        else:
+            lie_actor('B')
+
 # --------------------------------------------------
 # INPUT
 # --------------------------------------------------
@@ -2164,33 +2381,16 @@ def input(key):
         else:
             push_notification('Go near the front door')
 
+        actor_id = get_action_actor()
+
     if key in ('q', 'Q'):
-        if active_actor_id == 'A':
-            if is_seated_a:
-                stand_actor('A')
-            else:
-                sit_actor('A')
-        else:
-            if is_seated_b:
-                stand_actor('B')
-            else:
-                sit_actor('B')
+        handle_shared_sit_stand()
 
     if key in ('f', 'F'):
-        if active_actor_id == 'A':
-            if is_lying_a:
-                get_up_actor('A')
-            else:
-                lie_actor('A')
-        else:
-            if is_lying_b:
-                get_up_actor('B')
-            else:
-                lie_actor('B')
-
+        handle_shared_lie_getup()   
 
     if key in ('e', 'E'):
-        if active_actor_id == 'A':
+        if actor_id == 'A':
             hovered_device = hovered_device_from_mouse()
             if hovered_device:
                 hovered_device.toggle()
@@ -2275,12 +2475,8 @@ def update():
     global seat_timer_a, seat_timer_b
     global locked_seat_a, locked_seat_b
     global seat_target_a, seat_target_b
+    global last_controlled_actor
 
-
-    # if held_keys['middle mouse']:
-    #     CAMERA_YAW += mouse.velocity[0] * CAMERA_ROTATE_SPEED
-    #     CAMERA_PITCH -= mouse.velocity[1] * CAMERA_ROTATE_SPEED
-    #     CAMERA_PITCH = clamp(CAMERA_PITCH, 18, 75)
 
     if held_keys['right mouse'] and mouse.world_point is not None:
         set_move_target_for(active_actor_id, mouse.world_point, should_log=False)
@@ -2290,14 +2486,11 @@ def update():
     # A actor movement
     # --------------------------------
 
-    if active_actor_id == 'A':
-        manual_move_a = Vec3(
-            held_keys['d'] - held_keys['a'],
-            0,
-            held_keys['w'] - held_keys['s']
-        )
-    else:
-        manual_move_a = Vec3(0, 0, 0)
+    manual_move_a = Vec3(
+        held_keys['d'] - held_keys['a'],
+        0,
+        held_keys['w'] - held_keys['s']
+    )
 
     move_a = Vec3(0, 0, 0)
 
@@ -2305,9 +2498,12 @@ def update():
         manual_move_a = Vec3(0, 0, 0)
         move_target_a_active = False
 
+        
     if manual_move_a.length() > 0:
         move_a = manual_move_a.normalized()
         move_target_a_active = False
+        active_actor_id = 'A'
+
     elif move_target_a_active and move_target_a is not None:
         delta_a = Vec3(move_target_a.x - player_a.x, 0, move_target_a.z - player_a.z)
         if delta_a.length() <= 0.18:
@@ -2326,7 +2522,7 @@ def update():
         heading_a = math.degrees(math.atan2(move_a.x, move_a.z))
         megan_root.rotation_y = heading_a + 180
 
-    megan_root.position = Vec3(player_a.x, 0, player_a.z)
+    megan_root.position = Vec3(player_a.x, player_a.y, player_a.z)
 
     if megan:
         if pose_state_a == 'sit_down':
@@ -2351,6 +2547,8 @@ def update():
                 current_anim_a = 'idle'
                 pose_state_a = 'idle'
                 locked_seat_a = None
+                player_a.y = 0.85
+                megan_root.y = 0.85
                 log_event(
                     'stand_up_completed',
                     'A is now standing',
@@ -2460,14 +2658,13 @@ def update():
     # --------------------------------
     # B actor movement
     # --------------------------------
-    if active_actor_id == 'B':
-        manual_move_b = Vec3(
-            held_keys['d'] - held_keys['a'],
-            0,
-            held_keys['w'] - held_keys['s']
-        )
-    else:
-        manual_move_b = Vec3(0, 0, 0)
+    # YENİ — B her zaman ok tuşları
+
+    manual_move_b = Vec3(
+        held_keys['right arrow'] - held_keys['left arrow'],
+        0,
+        held_keys['up arrow'] - held_keys['down arrow']
+    )
 
     move_b = Vec3(0, 0, 0)
 
@@ -2478,6 +2675,8 @@ def update():
     if manual_move_b.length() > 0:
         move_b = manual_move_b.normalized()
         move_target_b_active = False
+        active_actor_id = 'B'
+
     elif move_target_b_active and move_target_b is not None:
         delta_b = Vec3(move_target_b.x - player_b.x, 0, move_target_b.z - player_b.z)
         if delta_b.length() <= 0.18:
@@ -2496,7 +2695,7 @@ def update():
         heading_b = math.degrees(math.atan2(move_b.x, move_b.z))
         sophie_root.rotation_y = heading_b + 180
 
-    sophie_root.position = Vec3(player_b.x, 0, player_b.z)
+    sophie_root.position = Vec3(player_b.x, player_b.y, player_b.z)
 
     if sophie:
         if pose_state_b == 'sit_down':
@@ -2521,6 +2720,8 @@ def update():
                 current_anim_b = 'idle'
                 pose_state_b = 'idle'
                 locked_seat_b = None
+                player_b.y = 0.85
+                sophie_root.y = 0.85
                 log_event(
                     'stand_up_completed',
                     'B is now standing',
