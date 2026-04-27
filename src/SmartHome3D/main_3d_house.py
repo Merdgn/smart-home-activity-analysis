@@ -1464,13 +1464,29 @@ kitchen_oven_model = load_static_model(
 
 kitchen_table = load_static_model(
     'Table_RoundSmall',
-    position=(-6.65, 0.0, -2.75),
+    position=(-6.60, 0.0, -3.55),
     rotation=(0, 0, 0),
     target_size=2.0,
     tint=color.hex("#D8B08C")
 )
 
 kitchen_table.texture = None
+
+kitchen_chair_1 = load_static_model(
+    'Chair_1',
+    position=(-6.60, 0.0, -2.10),
+    rotation=(0, 360, 0),
+    target_size=1.20,
+    tint=color.rgb(150, 105, 70)
+)
+
+kitchen_chair_2 = load_static_model(
+    'Chair_1',
+    position=(-6.60, 0.0, -4.75),
+    rotation=(0, 180, 0),
+    target_size=1.20,
+    tint=color.rgb(150, 105, 70)
+)
 
 # outlet / toaster / coffee machine are placeholders because this pack does not clearly include direct models
 
@@ -1879,7 +1895,25 @@ seat_points = [
         'occupied_by': None,
         'offset': Vec3(-0.42, 0.92, -0.65),
     },
+        # --- Kitchen Table Chairs ---
+    {
+        'name': 'Kitchen Chair Front',
+        'position': Vec3(-6.60, 0.0, -4.75),
+        'rotation_y': 180,
+        'seat_type': 'chair',
+        'occupied_by': None,
+        'offset': Vec3(0.0, 0.58, -0.12),
+    },
+    {
+        'name': 'Kitchen Chair Back',
+        'position': Vec3(-6.60, 0.0, -2.10),
+        'rotation_y': 0,
+        'seat_type': 'chair',
+        'occupied_by': None,
+        'offset': Vec3(0.0, 0.58, 0.12),
+    },
 ]
+
 
 bed_points = [
     {
