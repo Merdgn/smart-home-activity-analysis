@@ -1,3 +1,7 @@
+from ultralytics import YOLO
+
+model = YOLO("yolov8m.pt")
+
 from ursina import *
 from pathlib import Path
 from panda3d.core import Filename
@@ -15,6 +19,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ASSETS_PATH = PROJECT_ROOT / 'assets'
 CHARACTERS_PATH = ASSETS_PATH / 'characters' / 'exported'
 CAPTURES_DIR = ASSETS_PATH / 'captures'
+VISION_A_PATH = CAPTURES_DIR / 'vision_A.png'
+VISION_B_PATH = CAPTURES_DIR / 'vision_B.png'
+YOLO_A_RESULT_PATH = CAPTURES_DIR / 'yolo_A_result.png'
+YOLO_B_RESULT_PATH = CAPTURES_DIR / 'yolo_B_result.png'
 LOGS_DIR = PROJECT_ROOT / 'logs'
 CSV_LOG_PATH = LOGS_DIR / 'smart_home_event_log.csv'
 PLAN_VERSION = 'v1'
@@ -260,8 +268,7 @@ def log_event(code, message, actor_id='SYSTEM', actor_entity=None, room_name_ove
     )
 
 
-def save_vision_frame():
-    output_path = CAPTURES_DIR / 'vision_test.png'
+def save_vision_frame_for(actor_id, output_path, result_path, buffer):
     panda_path = Filename.from_os_specific(str(output_path))
 
     app.graphicsEngine.renderFrame()
@@ -270,15 +277,30 @@ def save_vision_frame():
     saved = app.screenshot(
         namePrefix=str(panda_path),
         defaultFilename=False,
-        source=vision_buffer
+        source=buffer
     )
 
     if saved:
-        print(f'[VISION] saved -> {output_path}')
-        log_event('vision_frame_saved', 'Vision frame saved')
+        print(f'[VISION][{actor_id}] saved -> {output_path}')
+        log_event(f'vision_frame_saved_{actor_id.lower()}', f'Vision frame saved for actor {actor_id}')
+
+        results = model.predict(
+            source=str(output_path),
+            imgsz=960,
+            conf=0.50,
+            iou=0.40,
+            max_det=10,
+            classes=[0]
+)
+        results[0].save(filename=str(result_path))
     else:
-        print('[VISION] screenshot failed')
-        push_notification('Vision save failed')
+        print(f'[VISION][{actor_id}] screenshot failed')
+        push_notification(f'Vision save failed for actor {actor_id}')
+
+
+def save_vision_frame():
+    save_vision_frame_for('A', VISION_A_PATH, YOLO_A_RESULT_PATH, vision_buffer_A)
+    save_vision_frame_for('B', VISION_B_PATH, YOLO_B_RESULT_PATH, vision_buffer_B)
 
 
 def find_asset_path(base_name):
@@ -1071,13 +1093,19 @@ camera.look_at(Vec3(0, 0, 0))
 # OFFSCREEN VISION CAMERA
 # --------------------------------------------------
 
-vision_buffer = app.win.makeTextureBuffer('VisionBuffer', 640, 640)
-vision_buffer.setSort(-100)
+# -------- CAMERA A --------
+vision_buffer_A = app.win.makeTextureBuffer('VisionBufferA', 640, 640)
+vision_buffer_A.setSort(-100)
 
-vision_cam = app.makeCamera(vision_buffer)
-vision_cam.reparentTo(app.render)
-vision_cam.setPos(0, 11, -10)
-vision_cam.lookAt(0, 0, 0)
+vision_cam_A = app.makeCamera(vision_buffer_A)
+vision_cam_A.reparentTo(app.render)
+
+# -------- CAMERA B --------
+vision_buffer_B = app.win.makeTextureBuffer('VisionBufferB', 640, 640)
+vision_buffer_B.setSort(-100)
+
+vision_cam_B = app.makeCamera(vision_buffer_B)
+vision_cam_B.reparentTo(app.render)
 
 # --------------------------------------------------
 # UI
@@ -3057,8 +3085,22 @@ def update():
     bathroom_hall_pivot.rotation_y = lerp(bathroom_hall_pivot.rotation_y, bathroom_door.target_y, 6 * time.dt)
 
     # vision camera A actor üzerinde kalsın
-    vision_cam.setPos(player_a.x, 10.5, player_a.z - 9.5)
-    vision_cam.lookAt(player_a.x, 0.8, player_a.z)
+    mid_x = (player_a.x + player_b.x) / 2
+    mid_z = (player_a.z + player_b.z) / 2
+
+    # A kamerası A karakterini takip etsin
+    OFFSET_Z = -3.5
+    HEIGHT = 10.0
+
+    vision_cam_A.setPos(player_a.x, HEIGHT, player_a.z + OFFSET_Z)
+    vision_cam_A.lookAt(player_a.x, 1.5, player_a.z)
+
+    vision_cam_B.setPos(player_b.x, HEIGHT, player_b.z + OFFSET_Z)
+    vision_cam_B.lookAt(player_b.x, 1.5, player_b.z)
+
+    if held_keys['t']:
+        print(f"A cam pos: {vision_cam_A.getPos()}")
+        print(f"B cam pos: {vision_cam_B.getPos()}")
 
 # --------------------------------------------------
 # STARTUP EVENTS
