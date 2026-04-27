@@ -184,7 +184,27 @@ def append_event_to_csv(event_code, event_message, actor_id='SYSTEM', actor_enti
         player_x = ''
         player_z = ''
 
-    device_name, device_state = extract_device_info(event_message)
+    DEVICE_EVENT_CODES = (
+        'bathroom_sink_on',
+        'bathroom_sink_off',
+        'living_lamp_on',
+        'living_lamp_off',
+        'kitchen_outlet_on',
+        'kitchen_outlet_off',
+        'coffee_machine_on',
+        'coffee_machine_off',
+        'toaster_on',
+        'toaster_off',
+        'kitchen_oven_on',
+        'kitchen_oven_off',
+        'front_door_opened',
+        'front_door_closed',
+    )
+
+    if event_code in DEVICE_EVENT_CODES:
+        device_name, device_state = extract_device_info(event_message)
+    else:
+        device_name, device_state = '-', '-'
 
     with open(CSV_LOG_PATH, 'a', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
@@ -1313,10 +1333,10 @@ bath_toilet = load_static_model(
 
 bath_shower = load_static_model(
     'Bathroom_Shower1',
-    position=(9.5, 0.0, -6.8),
-    rotation=(0, 180, 0),
-    target_size=2.4,
-    tint=color.rgb(120, 155, 175)
+    position=(9.55, 0.0, -7.35),
+    rotation=(0, 90, 0),
+    target_size=2.15,
+    tint=color.rgb(180, 210, 225)
 )
 
 bath_washer = load_static_model(
@@ -2353,94 +2373,87 @@ def handle_shared_lie_getup():
 def input(key):
     global CAMERA_DISTANCE, active_actor_id
 
+    actor_id = get_action_actor()  # 🔥 bunu en üste al
+
     if key == 'escape':
         application.quit()
 
     if key == 'tab':
         active_actor_id = 'B' if active_actor_id == 'A' else 'A'
         push_notification(f'Active Actor: {"Megan" if active_actor_id == "A" else "Sophie"}')
+        return
 
     if key in ('t', 'T'):
         save_vision_frame()
+        return
 
     if key in ('r', 'R'):
         if door_zone_active_a or door_zone_active_b:
             front_door.toggle()
         else:
             push_notification('Go near the front door')
-
-        actor_id = get_action_actor()
+        return
 
     if key in ('q', 'Q'):
         handle_shared_sit_stand()
+        return
 
     if key in ('f', 'F'):
-        handle_shared_lie_getup()   
+        handle_shared_lie_getup()
+        return
 
     if key in ('e', 'E'):
         if actor_id == 'A':
-            hovered_device = hovered_device_from_mouse()
-            if hovered_device:
-                hovered_device.toggle()
-                log_event(
-                    'device_interaction',
-                    f'A interacted with {hovered_device.name}',
-                    actor_id='A',
-                    actor_entity=player_a,
-                    room_name_override=current_room_a
-                )
-            else:
-                nearest_device, _ = get_nearest_device_for(player_a)
-                if nearest_device:
-                    nearest_device.toggle()
-                    log_event(
-                        'device_interaction',
-                        f'A interacted with {nearest_device.name}',
-                        actor_id='A',
-                        actor_entity=player_a,
-                        room_name_override=current_room_a
-                    )
-                else:
-                    push_notification('A: No device nearby')
+            actor_entity = player_a
+            room_name = current_room_a
         else:
-            hovered_device = hovered_device_from_mouse()
-            if hovered_device:
-                hovered_device.toggle()
+            actor_entity = player_b
+            room_name = current_room_b
+
+        hovered_device = hovered_device_from_mouse()
+
+        if hovered_device:
+            hovered_device.toggle()
+            log_event(
+                'device_interaction',
+                f'{actor_id} interacted with {hovered_device.name}',
+                actor_id=actor_id,
+                actor_entity=actor_entity,
+                room_name_override=room_name
+            )
+        else:
+            nearest_device, _ = get_nearest_device_for(actor_entity)
+            if nearest_device:
+                nearest_device.toggle()
                 log_event(
                     'device_interaction',
-                    f'B interacted with {hovered_device.name}',
-                    actor_id='B',
-                    actor_entity=player_b,
-                    room_name_override=current_room_b
+                    f'{actor_id} interacted with {nearest_device.name}',
+                    actor_id=actor_id,
+                    actor_entity=actor_entity,
+                    room_name_override=room_name
                 )
             else:
-                nearest_device, _ = get_nearest_device_for(player_b)
-                if nearest_device:
-                    nearest_device.toggle()
-                    log_event(
-                        'device_interaction',
-                        f'B interacted with {nearest_device.name}',
-                        actor_id='B',
-                        actor_entity=player_b,
-                        room_name_override=current_room_b
-                    )
-                else:
-                    push_notification('B: No device nearby')
+                push_notification(f'{actor_id}: No device nearby')
+        return
 
     if key == 'left mouse down':
         hovered_device = hovered_device_from_mouse()
         if hovered_device is None and mouse.world_point is not None:
             set_move_target_for(active_actor_id, mouse.world_point, should_log=True)
+        return
 
     if key == 'right mouse down':
         if mouse.world_point is not None:
             set_move_target_for(active_actor_id, mouse.world_point, should_log=True)
+        return
 
     if key == 'scroll up':
         CAMERA_DISTANCE = max(8.0, CAMERA_DISTANCE - CAMERA_ZOOM_SPEED)
+        return
 
     if key == 'scroll down':
         CAMERA_DISTANCE = min(40.0, CAMERA_DISTANCE + CAMERA_ZOOM_SPEED)
+        return
 
 # --------------------------------------------------
 # UPDATE
