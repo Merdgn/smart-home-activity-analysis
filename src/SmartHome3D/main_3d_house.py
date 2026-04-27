@@ -1410,6 +1410,43 @@ fridge = load_static_model(
 )
 fridge.texture = None
 
+# Buzdolabının sağında küçük tezgah
+stove_counter = Entity(
+    model='cube',
+    position=(-10.25, 0.45, -4.35),
+    scale=(1.20, 0.90, 3.00),
+    color=color.white,
+    collider='box'
+)
+
+# Beyaz gövdenin üstüne koyu kaplama
+stove_counter_cover = Entity(
+    model='cube',
+    position=(-10.25, 0.46, -4.35),
+    scale=(1.22, 0.92, 3.02),
+    color=color.dark_gray,
+    collider=None
+)
+
+kitchen_oven_model = Entity(
+    model='cube',
+    position=(-10.25, 0.94, -4.35),
+    scale=(0.95, 0.04, 2.25),
+    color=color.black,
+    collider='box'
+)
+
+for sx in [-0.25, 0.25]:
+    for sz in [-0.65, 0.65]:
+        Entity(
+            parent=kitchen_oven_model,
+            model='torus',
+            position=(sx, 0.06, sz),
+            rotation=(90, 0, 0),
+            scale=0.13,
+            color=color.white
+        )
+
 kitchen_sink_model = load_static_model(
     'Kitchen_Sink',
     position=(-8.65, 0.88, -7.25),
@@ -1417,26 +1454,6 @@ kitchen_sink_model = load_static_model(
     target_size=1.25,
     tint=color.rgb(170, 180, 185)
 )
-
-# GÖRÜNÜR OCAK
-kitchen_stove_top = Entity(
-    model='cube',
-    position=(-7.45, 0.93, -7.23),
-    scale=(1.05, 0.035, 0.72),
-    color=color.rgb(20, 20, 22),
-    collider='box'
-)
-
-for sx in [-0.28, 0.28]:
-    for sz in [-0.18, 0.18]:
-        Entity(
-            parent=kitchen_stove_top,
-            model='torus',
-            position=(sx, 0.04, sz),
-            rotation=(90, 0, 0),
-            scale=0.17,
-            color=color.rgb(230, 230, 230)
-        )
 
 kitchen_cabinet = load_static_model(
     'Kitchen_Cabinet1',
@@ -1452,14 +1469,6 @@ kitchen_drawers = load_static_model(
     rotation=(0, 180, 0),
     target_size=1.5,
     tint=color.rgb(175, 130, 80)
-)
-
-kitchen_oven_model = load_static_model(
-    'Kitchen_Oven_Large',
-    position=(-2.3, 0.0, -7.25),
-    rotation=(0, 180, 0),
-    target_size=2.0,
-    tint=color.rgb(55, 55, 60)
 )
 
 kitchen_table = load_static_model(
@@ -1499,9 +1508,9 @@ kitchen_outlet_entity = make_placeholder_box(
 
 toaster_entity = make_placeholder_box(
     name='Toaster',
-    position=(-4.6, 1.02, -7.05),
-    scale=(0.55, 0.24, 0.35),
-    color_value=color.rgb(120, 120, 125)
+    position=(-4.6, 1.04, -7.05),
+    scale=(0.42, 0.18, 0.28),
+    color_value=color.dark_gray
 )
 Entity(parent=toaster_entity, model='cube', position=(-0.12, 0.12, 0), scale=(0.06, 0.16, 0.12), color=color.light_gray)
 Entity(parent=toaster_entity, model='cube', position=(0.12, 0.12, 0), scale=(0.06, 0.16, 0.12), color=color.light_gray)
