@@ -2,6 +2,11 @@ from ultralytics import YOLO
 
 model = YOLO("yolov8m.pt")
 
+# YOLO COCO sınıfları:
+# 0=person, 56=chair, 57=couch, 59=bed,
+# 60=dining table, 69=oven, 71=sink, 72=refrigerator
+HOME_OBJECT_CLASSES = [0, 56, 57, 59, 60, 69, 71, 72]
+
 from ursina import *
 from pathlib import Path
 from panda3d.core import Filename
@@ -134,6 +139,66 @@ wall_entities = []
 # HELPERS
 # --------------------------------------------------
 
+COCO_LABELS = {
+    0: 'person',
+    56: 'chair',
+    57: 'couch',
+    59: 'bed',
+    60: 'dining table',
+    69: 'oven',
+    71: 'sink',
+    72: 'refrigerator'
+}
+
+ROOM_ALLOWED_OBJECTS = {
+    'Living Room': ['person', 'chair', 'couch', 'dining table'],
+    'Kitchen': ['person', 'chair', 'dining table', 'oven', 'sink', 'refrigerator'],
+    'Bedroom': ['person', 'chair', 'bed'],
+    'Bathroom': ['person', 'sink'],
+    'Hall': ['person'],
+    'Outside': ['person']
+}
+
+
+def filter_yolo_detections_by_room(results, room_name):
+    """
+    YOLO sonuçlarını oda bilgisine göre temizler.
+    Örn: Bedroom içinde refrigerator algılanırsa yok sayılır.
+    """
+    allowed_labels = ROOM_ALLOWED_OBJECTS.get(room_name, ['person'])
+
+    filtered = []
+
+    for box in results[0].boxes:
+        cls_id = int(box.cls[0])
+        conf = float(box.conf[0])
+        label = COCO_LABELS.get(cls_id, str(cls_id))
+
+        if label not in allowed_labels:
+            continue
+
+        x1, y1, x2, y2 = box.xyxy[0].tolist()
+
+        filtered.append({
+            'class_id': cls_id,
+            'label': label,
+            'conf': round(conf, 2),
+            'bbox': (round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1))
+        })
+
+    return filtered
+
+
+def print_filtered_detections(actor_id, room_name, detections):
+    if not detections:
+        print(f'[VISION][{actor_id}] filtered detections in {room_name}: none')
+        return
+
+    summary = ', '.join(
+        f"{d['label']}({d['conf']})" for d in detections
+    )
+
+    print(f'[VISION][{actor_id}] filtered detections in {room_name}: {summary}')
 
 def set_ui_text(text_obj, value, text_color=color.black):
     text_obj.text = value
@@ -282,17 +347,30 @@ def save_vision_frame_for(actor_id, output_path, result_path, buffer):
 
     if saved:
         print(f'[VISION][{actor_id}] saved -> {output_path}')
-        log_event(f'vision_frame_saved_{actor_id.lower()}', f'Vision frame saved for actor {actor_id}')
+        log_event(
+            f'vision_frame_saved_{actor_id.lower()}',
+            f'Vision frame saved for actor {actor_id}'
+        )
 
         results = model.predict(
             source=str(output_path),
             imgsz=960,
-            conf=0.50,
-            iou=0.40,
-            max_det=10,
-            classes=[0]
-)
+            conf=0.25,
+            iou=0.35,
+            max_det=20,
+            classes=HOME_OBJECT_CLASSES
+        )
+
+        if actor_id == 'A':
+            actor_room = current_room_a
+        else:
+            actor_room = current_room_b
+
+        filtered_detections = filter_yolo_detections_by_room(results, actor_room)
+        print_filtered_detections(actor_id, actor_room, filtered_detections)
+
         results[0].save(filename=str(result_path))
+
     else:
         print(f'[VISION][{actor_id}] screenshot failed')
         push_notification(f'Vision save failed for actor {actor_id}')
@@ -3088,15 +3166,15 @@ def update():
     mid_x = (player_a.x + player_b.x) / 2
     mid_z = (player_a.z + player_b.z) / 2
 
-    # A kamerası A karakterini takip etsin
-    OFFSET_Z = -3.5
-    HEIGHT = 10.0
+ 
+    CAM_HEIGHT = 7.0      
+    CAM_OFFSET_Z = -5.5  
 
-    vision_cam_A.setPos(player_a.x, HEIGHT, player_a.z + OFFSET_Z)
-    vision_cam_A.lookAt(player_a.x, 1.5, player_a.z)
+    vision_cam_A.setPos(player_a.x, CAM_HEIGHT, player_a.z + CAM_OFFSET_Z)
+    vision_cam_A.lookAt(player_a.x, 1.0, player_a.z)
 
-    vision_cam_B.setPos(player_b.x, HEIGHT, player_b.z + OFFSET_Z)
-    vision_cam_B.lookAt(player_b.x, 1.5, player_b.z)
+    vision_cam_B.setPos(player_b.x, CAM_HEIGHT, player_b.z + CAM_OFFSET_Z)
+    vision_cam_B.lookAt(player_b.x, 1.0, player_b.z)
 
     if held_keys['t']:
         print(f"A cam pos: {vision_cam_A.getPos()}")
