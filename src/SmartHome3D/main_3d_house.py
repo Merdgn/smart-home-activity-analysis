@@ -1,11 +1,42 @@
 from ultralytics import YOLO
+import cv2
 
-model = YOLO("yolov8m.pt")
+model = YOLO("models/smart_home_person_object_v1_best.pt")
+MODEL_LABELS = model.names
 
-# YOLO COCO sınıfları:
+LABEL_ALIASES = {
+    'person': 'person',
+    'bathtub': 'bathtub',
+    'bed': 'bed',
+    'chair': 'chair',
+    'couch': 'couch',
+    'door': 'door',
+    'drawer': 'drawer',
+    'fridge': 'fridge',
+    'lamp': 'lamp',
+    'mirror': 'mirror',
+    'nightstand': 'nightstand',
+    'plant': 'plant',
+    'sink': 'sink',
+    'table': 'table',
+    'toilet': 'toilet',
+    'toilet_paper': 'toilet_paper',
+    'towel': 'towel',
+    'trashcan': 'trashcan',
+    'window': 'window',
+    'shelf': 'shelf',
+    'oven': 'oven',
+    'cabinet': 'cabinet',
+    'carpet': 'carpet',
+    'plate': 'plate',
+    'fork': 'fork',
+    'spoon': 'spoon',
+    'knife': 'knife',
+}
+
 # 0=person, 56=chair, 57=couch, 59=bed,
 # 60=dining table, 69=oven, 71=sink, 72=refrigerator
-HOME_OBJECT_CLASSES = [0, 56, 57, 59, 60, 69, 71, 72]
+HOME_OBJECT_CLASSES = list(range(27))
 
 from ursina import *
 from pathlib import Path
@@ -122,6 +153,13 @@ is_lying_b = False
 lying_target_a = None
 lying_target_b = None
 
+bed_timer_a = 0.0
+bed_timer_b = 0.0
+
+pending_stand_pos_a = None
+pending_stand_pos_b = None
+pending_bed_exit_pos_a = None
+pending_bed_exit_pos_b = None
 
 CAMERA_YAW = 0.0
 CAMERA_PITCH = 38.0
@@ -134,30 +172,52 @@ UI_BLACK = color.rgb(15, 15, 15)
 UI_RED = color.rgb(180, 25, 25)
 
 wall_entities = []
+obstacle_entities = []
 
 # --------------------------------------------------
 # HELPERS
 # --------------------------------------------------
 
 COCO_LABELS = {
-    0: 'person',
-    56: 'chair',
-    57: 'couch',
-    59: 'bed',
-    60: 'dining table',
-    69: 'oven',
-    71: 'sink',
-    72: 'refrigerator'
+    0: 'bathtub',
+    1: 'bed',
+    2: 'chair',
+    3: 'couch',
+    4: 'door',
+    5: 'drawer',
+    6: 'fridge',
+    7: 'lamp',
+    8: 'mirror',
+    9: 'nightstand',
+    10: 'plant',
+    11: 'sink',
+    12: 'table',
+    13: 'toilet',
+    14: 'toilet_paper',
+    15: 'towel',
+    16: 'trashcan',
+    17: 'window',
+    18: 'shelf',
+    19: 'oven',
+    20: 'cabinet',
+    21: 'carpet',
+    22: 'plate',
+    23: 'fork',
+    24: 'spoon',
+    25: 'knife',
 }
 
 ROOM_ALLOWED_OBJECTS = {
-    'Living Room': ['person', 'chair', 'couch', 'dining table'],
-    'Kitchen': ['person', 'chair', 'dining table', 'oven', 'sink', 'refrigerator'],
-    'Bedroom': ['person', 'chair', 'bed'],
-    'Bathroom': ['person', 'sink'],
-    'Hall': ['person'],
-    'Outside': ['person']
+    'Living Room': ['person', 'chair', 'couch', 'table', 'lamp', 'plant', 'window', 'shelf', 'carpet'],
+    'Kitchen': ['person', 'chair', 'table', 'oven', 'sink', 'fridge', 'cabinet', 'drawer', 'plate', 'fork', 'spoon', 'knife'],
+    'Bedroom': ['person', 'bed', 'nightstand', 'drawer', 'lamp', 'plant'],
+    'Bathroom': ['person', 'sink', 'toilet', 'bathtub', 'mirror', 'towel', 'toilet_paper', 'trashcan'],
+    'Hall': ['person', 'door'],
+    'Outside': ['person', 'door']
 }
+
+def normalize_label(label):
+    return LABEL_ALIASES.get(label, label)
 
 
 def filter_yolo_detections_by_room(results, room_name):
@@ -172,7 +232,8 @@ def filter_yolo_detections_by_room(results, room_name):
     for box in results[0].boxes:
         cls_id = int(box.cls[0])
         conf = float(box.conf[0])
-        label = COCO_LABELS.get(cls_id, str(cls_id))
+        label = normalize_label(MODEL_LABELS.get(cls_id, str(cls_id)))
+
 
         if label not in allowed_labels:
             continue
@@ -189,6 +250,75 @@ def filter_yolo_detections_by_room(results, room_name):
     return filtered
 
 
+def infer_activity_from_state(actor_id, room_name, detected_labels):
+    """
+    Aktörün oda bilgisi, YOLO nesneleri ve simülasyon state'lerine göre
+    aktivite tahmini yapar.
+    """
+
+    if actor_id == 'A':
+        is_seated = is_seated_a
+        is_lying = is_lying_a
+    else:
+        is_seated = is_seated_b
+        is_lying = is_lying_b
+
+    # 1) Yatma durumu
+    if room_name == 'Bedroom' and is_lying:
+        return 'lying_on_bed'
+
+    # 2) Oturma durumu
+    if is_seated:
+        if room_name == 'Living Room':
+            return 'sitting_on_couch'
+        elif room_name == 'Kitchen':
+            return 'sitting_at_kitchen_table'
+        elif room_name == 'Bathroom':
+            return 'sitting_on_toilet'
+        else:
+            return 'sitting'
+
+    # 3) Banyo lavabo kullanımı
+    if room_name == 'Bathroom':
+        if sink_device.is_on:
+            return 'using_bathroom_sink'
+        return 'standing_in_bathroom'
+
+    # 4) Mutfak aktiviteleri
+    if room_name == 'Kitchen':
+        if oven_device.is_on:
+            return 'cooking_with_oven'
+        if coffee_device.is_on:
+            return 'using_coffee_machine'
+        if toaster_device.is_on:
+            return 'using_toaster'
+        if 'refrigerator' in detected_labels:
+            return 'near_refrigerator'
+        if 'dining table' in detected_labels or 'chair' in detected_labels:
+            return 'near_kitchen_table'
+        return 'standing_in_kitchen'
+
+    # 5) Salon aktiviteleri
+    if room_name == 'Living Room':
+        if 'couch' in detected_labels:
+            return 'near_couch'
+        if 'dining table' in detected_labels:
+            return 'near_living_table'
+        return 'standing_in_living_room'
+
+    # 6) Yatak odası
+    if room_name == 'Bedroom':
+        if 'bed' in detected_labels:
+            return 'near_bed'
+        return 'standing_in_bedroom'
+
+    # 7) Koridor / dış alan
+    if room_name == 'Hall':
+        return 'walking_in_hall'
+
+    return 'unknown_activity'
+
+
 def print_filtered_detections(actor_id, room_name, detections):
     if not detections:
         print(f'[VISION][{actor_id}] filtered detections in {room_name}: none')
@@ -199,6 +329,34 @@ def print_filtered_detections(actor_id, room_name, detections):
     )
 
     print(f'[VISION][{actor_id}] filtered detections in {room_name}: {summary}')
+
+def save_filtered_result_image(input_path, output_path, detections):
+    image = cv2.imread(str(input_path))
+
+    if image is None:
+        print(f'[VISION] could not read image: {input_path}')
+        return
+
+    for d in detections:
+        if 'bbox' not in d:
+            continue
+
+        x1, y1, x2, y2 = map(int, d['bbox'])
+        label = d['label']
+        conf = d['conf']
+
+        cv2.rectangle(image, (x1, y1), (x2, y2), (255, 180, 0), 2)
+        cv2.putText(
+            image,
+            f'{label} {conf}',
+            (x1, max(25, y1 - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 180, 0),
+            2
+        )
+
+    cv2.imwrite(str(output_path), image)
 
 def set_ui_text(text_obj, value, text_color=color.black):
     text_obj.text = value
@@ -354,22 +512,56 @@ def save_vision_frame_for(actor_id, output_path, result_path, buffer):
 
         results = model.predict(
             source=str(output_path),
-            imgsz=960,
-            conf=0.25,
+            imgsz=1280,
+            conf=0.20,
             iou=0.35,
-            max_det=20,
-            classes=HOME_OBJECT_CLASSES
+            max_det=30,
         )
+
+        raw_detections = []
+
+        for box in results[0].boxes:
+            cls_id = int(box.cls[0])
+            conf = float(box.conf[0])
+            label = normalize_label(MODEL_LABELS.get(cls_id, str(cls_id)))
+            raw_detections.append((label, round(conf, 2)))
+
+        print(f'[VISION][{actor_id}] raw detections -> {raw_detections}')
+
 
         if actor_id == 'A':
             actor_room = current_room_a
         else:
             actor_room = current_room_b
 
+
         filtered_detections = filter_yolo_detections_by_room(results, actor_room)
         print_filtered_detections(actor_id, actor_room, filtered_detections)
 
-        results[0].save(filename=str(result_path))
+        detected_labels = [d['label'] for d in filtered_detections]
+
+        if detected_labels:
+            detected_summary = ', '.join(detected_labels)
+        else:
+            detected_summary = 'none'
+
+        activity = infer_activity_from_state(actor_id, actor_room, detected_labels)
+
+        log_event(
+            f'vision_objects_detected_{actor_id.lower()}',
+            f'Filtered YOLO objects: {detected_summary}',
+            actor_id=actor_id,
+            room_name_override=actor_room
+        )
+
+        log_event(
+            f'vision_activity_detected_{actor_id.lower()}',
+            f'Activity detected: {activity}',
+            actor_id=actor_id,
+            room_name_override=actor_room
+        )
+
+        save_filtered_result_image(output_path, result_path, filtered_detections)
 
     else:
         print(f'[VISION][{actor_id}] screenshot failed')
@@ -377,6 +569,12 @@ def save_vision_frame_for(actor_id, output_path, result_path, buffer):
 
 
 def save_vision_frame():
+    update_vision_cameras()
+
+    app.graphicsEngine.renderFrame()
+    app.graphicsEngine.renderFrame()
+    app.graphicsEngine.renderFrame()
+
     save_vision_frame_for('A', VISION_A_PATH, YOLO_A_RESULT_PATH, vision_buffer_A)
     save_vision_frame_for('B', VISION_B_PATH, YOLO_B_RESULT_PATH, vision_buffer_B)
 
@@ -513,6 +711,20 @@ def add_wall(position, scale, wall_color=color.white, wall_texture=None, texture
     wall_entities.append(wall)
     return wall
 
+def add_obstacle_box(name, position, scale, rotation=(0, 0, 0), debug=False):
+    obstacle = Entity(
+        model='cube',
+        position=position,
+        rotation=rotation,
+        scale=scale,
+        color=color.rgba(255, 0, 0, 70) if debug else color.rgba(0, 0, 0, 0),
+        collider='box',
+        visible=debug
+    )
+
+    obstacle.name = name
+    obstacle_entities.append(obstacle)
+    return obstacle
 
 def add_room_floor(position, scale, color_value):
     floor = Entity(
@@ -531,8 +743,8 @@ def can_move_to(actor_entity, new_position):
     actor_entity.position = new_position
     hit_wall = False
 
-    for wall in wall_entities:
-        if actor_entity.intersects(wall).hit:
+    for obstacle in wall_entities + obstacle_entities:
+        if actor_entity.intersects(obstacle).hit:
             hit_wall = True
             break
 
@@ -555,6 +767,38 @@ def move_with_wall_collision(actor_entity, move_vector, speed):
     test_pos_z = Vec3(actor_entity.x, actor_entity.y, actor_entity.z + step.z)
     if can_move_to(actor_entity, test_pos_z):
         actor_entity.z = test_pos_z.z
+
+def find_free_position_near(actor_entity, preferred_position=None, max_radius=2.2, step=0.35):
+    if preferred_position is None:
+        preferred_position = Vec3(actor_entity.x, 0.85, actor_entity.z)
+
+    base = Vec3(preferred_position.x, 0.85, preferred_position.z)
+
+    directions = [
+        Vec3(0, 0, 0),
+        Vec3(1, 0, 0), Vec3(-1, 0, 0),
+        Vec3(0, 0, 1), Vec3(0, 0, -1),
+        Vec3(0.707, 0, 0.707), Vec3(0.707, 0, -0.707),
+        Vec3(-0.707, 0, 0.707), Vec3(-0.707, 0, -0.707),
+    ]
+
+    radius = 0.0
+
+    while radius <= max_radius:
+        for direction in directions:
+            candidate = base + direction * radius
+            candidate = Vec3(
+                clamp(candidate.x, -10.3, 10.3),
+                0.85,
+                clamp(candidate.z, -9.8, 8.4)
+            )
+
+            if can_move_to(actor_entity, candidate):
+                return candidate
+
+        radius += step
+
+    return Vec3(preferred_position.x, 0.85, preferred_position.z)
 
         
 def create_zone(position, scale, tint=color.rgba(255, 255, 0, 35)):
@@ -1172,14 +1416,14 @@ camera.look_at(Vec3(0, 0, 0))
 # --------------------------------------------------
 
 # -------- CAMERA A --------
-vision_buffer_A = app.win.makeTextureBuffer('VisionBufferA', 640, 640)
+vision_buffer_A = app.win.makeTextureBuffer('VisionBufferA', 960, 960)
 vision_buffer_A.setSort(-100)
 
 vision_cam_A = app.makeCamera(vision_buffer_A)
 vision_cam_A.reparentTo(app.render)
 
 # -------- CAMERA B --------
-vision_buffer_B = app.win.makeTextureBuffer('VisionBufferB', 640, 640)
+vision_buffer_B = app.win.makeTextureBuffer('VisionBufferB', 960, 960)
 vision_buffer_B.setSort(-100)
 
 vision_cam_B = app.makeCamera(vision_buffer_B)
@@ -1190,7 +1434,7 @@ vision_cam_B.reparentTo(app.render)
 # --------------------------------------------------
 
 info_text = Text(
-    text='WASD=A | Arrows=B | Mouse click moves active actor | E=A interact | Right Shift=B interact | Middle drag camera | R door | T vision | ESC exit',
+    text='A: WASD | B: Arrow Keys | Both can move at the same time | Mouse click moves active actor | Q sit/stand | F lie/get up | E interact | T vision | ESC exit',
     position=(-0.86, 0.46),
     scale=0.90,
     background=True,
@@ -1309,7 +1553,7 @@ living_couch_2 = load_static_model(
     position=(-4.7, 0.0, 1.8),
     rotation=(0, 180, 0),
     target_size=3.2,
-    tint=color.rgb(125, 100, 85)
+    tint=color.rgb(125, 100, 85),
 )
 
 
@@ -1957,7 +2201,6 @@ def build_scenario_4():
 # --------------------------------------------------
 
 seat_points = [
-    # --- Couch_Small2 (-8.8, 5.3, rot=90) ---
     {
         'name': 'Small Couch Left',
         'position': Vec3(-8.8, 0.0, 5.65),
@@ -1965,6 +2208,7 @@ seat_points = [
         'seat_type': 'couch',
         'occupied_by': None,
         'offset': Vec3(-0.35, 0.58, 0.0),
+        'stand_position': Vec3(-7.10, 0.85, 5.65),
     },
     {
         'name': 'Small Couch Right',
@@ -1973,9 +2217,8 @@ seat_points = [
         'seat_type': 'couch',
         'occupied_by': None,
         'offset': Vec3(-0.35, 0.58, 0.0),
+        'stand_position': Vec3(-7.10, 0.85, 4.95),
     },
-
-    # --- Couch_Large2 (-4.7, 1.8, rot=180) ---
     {
         'name': 'Large Couch Left',
         'position': Vec3(-5.7, 0.0, 1.8),
@@ -1983,6 +2226,7 @@ seat_points = [
         'seat_type': 'couch',
         'occupied_by': None,
         'offset': Vec3(0.0, 0.58, -0.35),
+        'stand_position': Vec3(-5.70, 0.85, 3.10),
     },
     {
         'name': 'Large Couch Center',
@@ -1991,6 +2235,7 @@ seat_points = [
         'seat_type': 'couch',
         'occupied_by': None,
         'offset': Vec3(0.0, 0.58, -0.35),
+        'stand_position': Vec3(-4.70, 0.85, 3.10),
     },
     {
         'name': 'Large Couch Right',
@@ -1999,9 +2244,8 @@ seat_points = [
         'seat_type': 'couch',
         'occupied_by': None,
         'offset': Vec3(0.0, 0.58, -0.35),
+        'stand_position': Vec3(-3.70, 0.85, 3.10),
     },
-
-    # --- Bathroom Toilet ---
     {
         'name': 'Bathroom Toilet',
         'position': Vec3(9.5, 0.0, -3.8),
@@ -2009,8 +2253,8 @@ seat_points = [
         'seat_type': 'toilet',
         'occupied_by': None,
         'offset': Vec3(-0.42, 0.92, -0.65),
+        'stand_position': Vec3(8.10, 0.85, -3.80),
     },
-        # --- Kitchen Table Chairs ---
     {
         'name': 'Kitchen Chair Front',
         'position': Vec3(-6.60, 0.0, -4.75),
@@ -2018,6 +2262,7 @@ seat_points = [
         'seat_type': 'chair',
         'occupied_by': None,
         'offset': Vec3(0.0, 0.58, -0.12),
+        'stand_position': Vec3(-6.60, 0.85, -5.95),
     },
     {
         'name': 'Kitchen Chair Back',
@@ -2026,6 +2271,7 @@ seat_points = [
         'seat_type': 'chair',
         'occupied_by': None,
         'offset': Vec3(0.0, 0.58, 0.12),
+        'stand_position': Vec3(-6.60, 0.85, -0.90),
     },
 ]
 
@@ -2037,7 +2283,8 @@ bed_points = [
         'rotation_y': 90,
         'occupied_by': None,
         'offset': Vec3(-0.10, 1.55, 0.00),
-        'stand_position': Vec3(5.35, 0.85, 5.35),
+        'stand_position': Vec3(6.20, 0.85, 3.45),
+
     },
     {
         'name': 'King Bed Right',
@@ -2045,7 +2292,8 @@ bed_points = [
         'rotation_y': 90,
         'occupied_by': None,
         'offset': Vec3(0.10, 1.55, 0.00),
-        'stand_position': Vec3(8.95, 0.85, 5.35),
+        'stand_position': Vec3(8.00, 0.85, 3.45),
+
     },
     {
         'name': 'Single Bed',
@@ -2053,9 +2301,125 @@ bed_points = [
         'rotation_y': 90,
         'occupied_by': None,
         'offset': Vec3(0.00, 1.20, 0.00),
-        'stand_position': Vec3(3.85, 0.85, 5.20),
+        'stand_position': Vec3(3.70, 0.85, 4.00),
     },
 ]
+
+# --------------------------------------------------
+# FURNITURE COLLISION BOXES
+# --------------------------------------------------
+
+# Living Room
+add_obstacle_box(
+    'Living Couch Small Collision',
+    position=(-8.8, 0.75, 5.3),
+    scale=(1.2, 1.5, 2.8)
+)
+
+add_obstacle_box(
+    'Living Couch Large Collision',
+    position=(-4.7, 0.75, 1.8),
+    scale=(3.2, 1.5, 1.2)
+)
+
+add_obstacle_box(
+    'Living Table Collision',
+    position=(-5.0, 0.55, 4.6),
+    scale=(1.6, 1.1, 1.6)
+)
+
+add_obstacle_box(
+    'Living Shelf Collision',
+    position=(-10.5, 1.0, 1.5),
+    scale=(0.8, 2.0, 2.2)
+)
+
+# Bedroom
+add_obstacle_box(
+    'King Bed Collision',
+    position=(7.1, 0.65, 5.4),
+    scale=(3.4, 1.3, 2.4)
+)
+
+add_obstacle_box(
+    'Single Bed Collision',
+    position=(4.9, 0.65, 5.7),
+    scale=(1.5, 1.3, 2.4)
+)
+
+add_obstacle_box(
+    'Nightstand Collision',
+    position=(9.3, 0.55, 5.0),
+    scale=(0.9, 1.1, 0.9)
+)
+
+add_obstacle_box(
+    'Bedroom Drawer Collision',
+    position=(10.3, 0.8, 8.0),
+    scale=(1.0, 1.6, 1.5)
+)
+
+# Bathroom
+add_obstacle_box(
+    'Bathroom Sink Collision',
+    position=(6.3, 0.8, -1.2),
+    scale=(1.5, 1.6, 0.9)
+)
+
+add_obstacle_box(
+    'Bathroom Toilet Collision',
+    position=(9.5, 0.65, -3.8),
+    scale=(1.2, 1.3, 1.2)
+)
+
+add_obstacle_box(
+    'Bathroom Shower Collision',
+    position=(9.55, 0.9, -7.35),
+    scale=(1.7, 1.8, 1.7)
+)
+
+add_obstacle_box(
+    'Bathroom Bathtub Collision',
+    position=(4.0, 0.65, -1.0),
+    scale=(2.6, 1.3, 1.4)
+)
+
+# Kitchen
+add_obstacle_box(
+    'Kitchen Counter Collision',
+    position=(-5.0, 0.65, -7.25),
+    scale=(7.9, 1.3, 1.15)
+)
+
+add_obstacle_box(
+    'Kitchen Fridge Collision',
+    position=(-9.85, 1.2, -2.15),
+    scale=(1.2, 2.4, 1.2)
+)
+
+add_obstacle_box(
+    'Kitchen Stove Counter Collision',
+    position=(-10.25, 0.65, -4.35),
+    scale=(1.2, 1.3, 3.0)
+)
+
+add_obstacle_box(
+    'Kitchen Table Collision',
+    position=(-6.60, 0.65, -3.55),
+    scale=(2.0, 1.3, 2.0)
+)
+
+add_obstacle_box(
+    'Kitchen Chair Front Collision',
+    position=(-6.60, 0.65, -4.75),
+    scale=(0.8, 1.3, 0.8)
+)
+
+add_obstacle_box(
+    'Kitchen Chair Back Collision',
+    position=(-6.60, 0.65, -2.10),
+    scale=(0.8, 1.3, 0.8)
+)
 
 # --------------------------------------------------
 # SENSOR ZONES
@@ -2314,6 +2678,8 @@ def stand_actor(actor_id):
     global seat_timer_a, seat_timer_b
     global locked_seat_a, locked_seat_b
     global current_anim_a, current_anim_b
+    global pending_stand_pos_a, pending_stand_pos_b
+
 
     if actor_id == 'A':
         if not is_seated_a:
@@ -2326,6 +2692,10 @@ def stand_actor(actor_id):
         is_seated_a = False
         if locked_seat_a:
             locked_seat_a['occupied_by'] = None
+
+        preferred_pos = locked_seat_a.get('stand_position') if locked_seat_a else None
+        pending_stand_pos_a = find_free_position_near(player_a, preferred_pos)
+
 
         log_event(
             'stand_up_started',
@@ -2346,6 +2716,10 @@ def stand_actor(actor_id):
         is_seated_b = False
         if locked_seat_b:
             locked_seat_b['occupied_by'] = None
+
+        preferred_pos = locked_seat_b.get('stand_position') if locked_seat_b else None
+        pending_stand_pos_b = find_free_position_near(player_b, preferred_pos)
+
 
         log_event(
             'stand_up_started',
@@ -2386,6 +2760,7 @@ def lie_actor(actor_id):
     global lying_target_a, lying_target_b
     global pose_state_a, pose_state_b
     global current_anim_a, current_anim_b
+    global bed_timer_a, bed_timer_b
 
     actor_entity = player_a if actor_id == 'A' else player_b
     actor_root = megan_root if actor_id == 'A' else sophie_root
@@ -2419,10 +2794,12 @@ def lie_actor(actor_id):
         is_lying_a = True
         lying_target_a = nearest_bed
         pose_state_a = 'lie_down'
+        bed_timer_a = 1.4
     else:
         is_lying_b = True
         lying_target_b = nearest_bed
         pose_state_b = 'lie_down'
+        bed_timer_b = 1.4
 
     if actor_model and 'lie_down' in actor_model.getAnimNames():
         actor_model.play('lie_down')
@@ -2440,9 +2817,10 @@ def get_up_actor(actor_id):
     global lying_target_a, lying_target_b
     global pose_state_a, pose_state_b
     global current_anim_a, current_anim_b
+    global bed_timer_a, bed_timer_b
+    global pending_bed_exit_pos_a, pending_bed_exit_pos_b
 
     actor_entity = player_a if actor_id == 'A' else player_b
-    actor_root = megan_root if actor_id == 'A' else sophie_root
     actor_model = megan if actor_id == 'A' else sophie
 
     stand_pos = None
@@ -2452,24 +2830,26 @@ def get_up_actor(actor_id):
             stand_pos = lying_target_a.get('stand_position')
             lying_target_a['occupied_by'] = None
         lying_target_a = None
-        is_lying_a = False
         pose_state_a = 'get_up_from_bed'
+        is_lying_a = False
     else:
         if lying_target_b:
             stand_pos = lying_target_b.get('stand_position')
             lying_target_b['occupied_by'] = None
         lying_target_b = None
-        is_lying_b = False
         pose_state_b = 'get_up_from_bed'
+        is_lying_b = False
 
-    if stand_pos is not None:
-        actor_entity.position = Vec3(stand_pos.x, stand_pos.y, stand_pos.z)
-        actor_root.position = Vec3(stand_pos.x, stand_pos.y, stand_pos.z)
+    preferred_pos = stand_pos if stand_pos is not None else Vec3(actor_entity.x, 0.85, actor_entity.z - 1.2)
 
-        if actor_id == 'A':
-            megan_root.rotation_y = 90
-        else:
-            sophie_root.rotation_y = 270
+    if actor_id == 'A':
+        pending_bed_exit_pos_a = find_free_position_near(player_a, preferred_pos, max_radius=3.0)
+        bed_timer_a = 1.15
+        megan_root.rotation_y = 0
+    else:
+        pending_bed_exit_pos_b = find_free_position_near(player_b, preferred_pos, max_radius=3.0)
+        bed_timer_b = 1.15
+        sophie_root.rotation_y = 0
 
     if actor_model and 'get_up_from_bed' in actor_model.getAnimNames():
         actor_model.play('get_up_from_bed')
@@ -2481,6 +2861,8 @@ def get_up_actor(actor_id):
         actor_entity=actor_entity,
         room_name_override=get_room_name(actor_entity.position)
     )
+
+
 
 def get_action_actor():
     return active_actor_id
@@ -2626,6 +3008,10 @@ def update():
     global locked_seat_a, locked_seat_b
     global seat_target_a, seat_target_b
     global last_controlled_actor
+    global bed_timer_a, bed_timer_b
+    global pending_stand_pos_a, pending_stand_pos_b
+    global pending_bed_exit_pos_a, pending_bed_exit_pos_b
+
 
 
     if held_keys['right mouse'] and mouse.world_point is not None:
@@ -2633,7 +3019,7 @@ def update():
 
 
     # --------------------------------
-    # A actor movement
+    # A actor movement - WASD
     # --------------------------------
 
     manual_move_a = Vec3(
@@ -2648,11 +3034,10 @@ def update():
         manual_move_a = Vec3(0, 0, 0)
         move_target_a_active = False
 
-        
     if manual_move_a.length() > 0:
         move_a = manual_move_a.normalized()
         move_target_a_active = False
-        active_actor_id = 'A'
+        last_controlled_actor = 'A'
 
     elif move_target_a_active and move_target_a is not None:
         delta_a = Vec3(move_target_a.x - player_a.x, 0, move_target_a.z - player_a.z)
@@ -2672,96 +3057,20 @@ def update():
         heading_a = math.degrees(math.atan2(move_a.x, move_a.z))
         megan_root.rotation_y = heading_a + 180
 
-    megan_root.position = Vec3(player_a.x, player_a.y, player_a.z)
+    if pose_state_a == 'idle':
+        megan_root.position = Vec3(player_a.x, 0, player_a.z)
 
-    if megan:
-        if pose_state_a == 'sit_down':
-            seat_timer_a -= time.dt
-            if seat_timer_a <= 0:
-                play_actor_anim(megan, 'sit_idle', loop=True)
-                current_anim_a = 'sit_idle'
-                pose_state_a = 'sit_idle'
-                is_seated_a = True
-                log_event(
-                    'sit_idle_started',
-                    f"A is now seated on {locked_seat_a['name'] if locked_seat_a else 'seat'}",
-                    actor_id='A',
-                    actor_entity=player_a,
-                    room_name_override=current_room_a
-                )
-
-        elif pose_state_a == 'stand_up':
-            seat_timer_a -= time.dt
-            if seat_timer_a <= 0:
-                play_actor_anim(megan, 'idle', loop=True)
+    if megan and pose_state_a == 'idle':
+        if is_moving_a and 'walk' in megan.getAnimNames():
+            if current_anim_a != 'walk':
+                megan.loop('walk')
+                current_anim_a = 'walk'
+        elif not is_moving_a and 'idle' in megan.getAnimNames():
+            if current_anim_a != 'idle':
+                megan.loop('idle')
                 current_anim_a = 'idle'
-                pose_state_a = 'idle'
-                locked_seat_a = None
-                player_a.y = 0.85
-                megan_root.y = 0.85
-                log_event(
-                    'stand_up_completed',
-                    'A is now standing',
-                    actor_id='A',
-                    actor_entity=player_a,
-                    room_name_override=current_room_a
-                )
 
-        elif pose_state_a == 'lie_down':
-            if current_anim_a != 'lie_down':
-                play_actor_anim(megan, 'lie_down', loop=False)
-                current_anim_a = 'lie_down'
-
-            if not megan.getCurrentAnim():
-                play_actor_anim(megan, 'sleep_idle', loop=True)
-                current_anim_a = 'sleep_idle'
-                pose_state_a = 'sleep_idle'
-                log_event(
-                    'sleep_idle_started',
-                    'A is now lying on bed',
-                    actor_id='A',
-                    actor_entity=player_a,
-                    room_name_override=current_room_a
-                )
-
-        elif pose_state_a == 'get_up_from_bed':
-            if current_anim_a != 'get_up_from_bed':
-                play_actor_anim(megan, 'get_up_from_bed', loop=False)
-                current_anim_a = 'get_up_from_bed'
-
-            if not megan.getCurrentAnim():
-                play_actor_anim(megan, 'idle', loop=True)
-                current_anim_a = 'idle'
-                pose_state_a = 'idle'
-                log_event(
-                    'get_up_from_bed_completed',
-                    'A got up from bed',
-                    actor_id='A',
-                    actor_entity=player_a,
-                    room_name_override=current_room_a
-                )
-
-        elif pose_state_a == 'sit_idle':
-            if current_anim_a != 'sit_idle':
-                play_actor_anim(megan, 'sit_idle', loop=True)
-                current_anim_a = 'sit_idle'
-
-        elif pose_state_a == 'sleep_idle':
-            if current_anim_a != 'sleep_idle':
-                play_actor_anim(megan, 'sleep_idle', loop=True)
-                current_anim_a = 'sleep_idle'
-
-        elif pose_state_a == 'idle':
-            if is_moving_a:
-                if current_anim_a != 'walk':
-                    play_actor_anim(megan, 'walk', loop=True)
-                    current_anim_a = 'walk'
-            else:
-                if current_anim_a != 'idle':
-                    play_actor_anim(megan, 'idle', loop=True)
-                    current_anim_a = 'idle'
-
-    # --------------------------------
+        # --------------------------------
     # seat animation flow A
     # --------------------------------
     if pose_state_a == 'sit_down':
@@ -2785,7 +3094,15 @@ def update():
             play_actor_anim(megan, 'idle', loop=True)
             current_anim_a = 'idle'
             pose_state_a = 'idle'
+
+            if pending_stand_pos_a is not None:
+                player_a.position = pending_stand_pos_a
+                player_a.y = 0.85
+                megan_root.position = Vec3(pending_stand_pos_a.x, 0, pending_stand_pos_a.z)
+                pending_stand_pos_a = None
+
             locked_seat_a = None
+
             log_event(
                 'stand_up_completed',
                 'A is now standing',
@@ -2793,6 +3110,8 @@ def update():
                 actor_entity=player_a,
                 room_name_override=current_room_a
             )
+
+
 
     if megan and pose_state_a == 'idle':
         if is_moving_a and 'walk' in megan.getAnimNames():
@@ -2806,9 +3125,8 @@ def update():
 
 
     # --------------------------------
-    # B actor movement
+    # B actor movement - Arrow Keys
     # --------------------------------
-    # YENİ — B her zaman ok tuşları
 
     manual_move_b = Vec3(
         held_keys['right arrow'] - held_keys['left arrow'],
@@ -2825,7 +3143,7 @@ def update():
     if manual_move_b.length() > 0:
         move_b = manual_move_b.normalized()
         move_target_b_active = False
-        active_actor_id = 'B'
+        last_controlled_actor = 'B'
 
     elif move_target_b_active and move_target_b is not None:
         delta_b = Vec3(move_target_b.x - player_b.x, 0, move_target_b.z - player_b.z)
@@ -2845,96 +3163,20 @@ def update():
         heading_b = math.degrees(math.atan2(move_b.x, move_b.z))
         sophie_root.rotation_y = heading_b + 180
 
-    sophie_root.position = Vec3(player_b.x, player_b.y, player_b.z)
+    if pose_state_b == 'idle':
+        sophie_root.position = Vec3(player_b.x, 0, player_b.z)
 
-    if sophie:
-        if pose_state_b == 'sit_down':
-            seat_timer_b -= time.dt
-            if seat_timer_b <= 0:
-                play_actor_anim(sophie, 'sit_idle', loop=True)
-                current_anim_b = 'sit_idle'
-                pose_state_b = 'sit_idle'
-                is_seated_b = True
-                log_event(
-                    'sit_idle_started',
-                    f"B is now seated on {locked_seat_b['name'] if locked_seat_b else 'seat'}",
-                    actor_id='B',
-                    actor_entity=player_b,
-                    room_name_override=current_room_b
-                )
-
-        elif pose_state_b == 'stand_up':
-            seat_timer_b -= time.dt
-            if seat_timer_b <= 0:
-                play_actor_anim(sophie, 'idle', loop=True)
+    if sophie and pose_state_b == 'idle':
+        if is_moving_b and 'walk' in sophie.getAnimNames():
+            if current_anim_b != 'walk':
+                sophie.loop('walk')
+                current_anim_b = 'walk'
+        elif not is_moving_b and 'idle' in sophie.getAnimNames():
+            if current_anim_b != 'idle':
+                sophie.loop('idle')
                 current_anim_b = 'idle'
-                pose_state_b = 'idle'
-                locked_seat_b = None
-                player_b.y = 0.85
-                sophie_root.y = 0.85
-                log_event(
-                    'stand_up_completed',
-                    'B is now standing',
-                    actor_id='B',
-                    actor_entity=player_b,
-                    room_name_override=current_room_b
-                )
 
-        elif pose_state_b == 'lie_down':
-            if current_anim_b != 'lie_down':
-                play_actor_anim(sophie, 'lie_down', loop=False)
-                current_anim_b = 'lie_down'
-
-            if not sophie.getCurrentAnim():
-                play_actor_anim(sophie, 'sleep_idle', loop=True)
-                current_anim_b = 'sleep_idle'
-                pose_state_b = 'sleep_idle'
-                log_event(
-                    'sleep_idle_started',
-                    'B is now lying on bed',
-                    actor_id='B',
-                    actor_entity=player_b,
-                    room_name_override=current_room_b
-                )
-
-        elif pose_state_b == 'get_up_from_bed':
-            if current_anim_b != 'get_up_from_bed':
-                play_actor_anim(sophie, 'get_up_from_bed', loop=False)
-                current_anim_b = 'get_up_from_bed'
-
-            if not sophie.getCurrentAnim():
-                play_actor_anim(sophie, 'idle', loop=True)
-                current_anim_b = 'idle'
-                pose_state_b = 'idle'
-                log_event(
-                    'get_up_from_bed_completed',
-                    'B got up from bed',
-                    actor_id='B',
-                    actor_entity=player_b,
-                    room_name_override=current_room_b
-                )
-
-        elif pose_state_b == 'sit_idle':
-            if current_anim_b != 'sit_idle':
-                play_actor_anim(sophie, 'sit_idle', loop=True)
-                current_anim_b = 'sit_idle'
-
-        elif pose_state_b == 'sleep_idle':
-            if current_anim_b != 'sleep_idle':
-                play_actor_anim(sophie, 'sleep_idle', loop=True)
-                current_anim_b = 'sleep_idle'
-
-        elif pose_state_b == 'idle':
-            if is_moving_b:
-                if current_anim_b != 'walk':
-                    play_actor_anim(sophie, 'walk', loop=True)
-                    current_anim_b = 'walk'
-            else:
-                if current_anim_b != 'idle':
-                    play_actor_anim(sophie, 'idle', loop=True)
-                    current_anim_b = 'idle'
-
-    # --------------------------------
+        # --------------------------------
     # seat animation flow B
     # --------------------------------
     if pose_state_b == 'sit_down':
@@ -2958,7 +3200,15 @@ def update():
             play_actor_anim(sophie, 'idle', loop=True)
             current_anim_b = 'idle'
             pose_state_b = 'idle'
+
+            if pending_stand_pos_b is not None:
+                player_b.position = pending_stand_pos_b
+                player_b.y = 0.85
+                sophie_root.position = Vec3(pending_stand_pos_b.x, 0, pending_stand_pos_b.z)
+                pending_stand_pos_b = None
+
             locked_seat_b = None
+
             log_event(
                 'stand_up_completed',
                 'B is now standing',
@@ -2966,6 +3216,8 @@ def update():
                 actor_entity=player_b,
                 room_name_override=current_room_b
             )
+
+
 
     if sophie and pose_state_b == 'idle':
         if is_moving_b and 'walk' in sophie.getAnimNames():
@@ -2976,6 +3228,91 @@ def update():
             if current_anim_b != 'idle':
                 sophie.loop('idle')
                 current_anim_b = 'idle'
+
+
+        # --------------------------------
+    # bed animation flow A
+    # --------------------------------
+    if pose_state_a == 'lie_down':
+        bed_timer_a -= time.dt
+        if bed_timer_a <= 0:
+            play_actor_anim(megan, 'sleep_idle', loop=True)
+            current_anim_a = 'sleep_idle'
+            pose_state_a = 'sleep_idle'
+            is_lying_a = True
+            log_event(
+                'sleep_idle_started',
+                'A is now lying on bed',
+                actor_id='A',
+                actor_entity=player_a,
+                room_name_override=current_room_a
+            )
+
+    elif pose_state_a == 'get_up_from_bed':
+        bed_timer_a -= time.dt
+        if bed_timer_a <= 0:
+            play_actor_anim(megan, 'idle', loop=True)
+            current_anim_a = 'idle'
+            pose_state_a = 'idle'
+
+            if pending_bed_exit_pos_a is not None:
+                player_a.position = pending_bed_exit_pos_a
+                player_a.y = 0.85
+                megan_root.position = Vec3(pending_bed_exit_pos_a.x, 0, pending_bed_exit_pos_a.z)
+                pending_bed_exit_pos_a = None
+
+            is_lying_a = False
+
+            log_event(
+                'get_up_from_bed_completed',
+                'A is now standing after getting up from bed',
+                actor_id='A',
+                actor_entity=player_a,
+                room_name_override=current_room_a
+            )
+
+
+        # --------------------------------
+    # bed animation flow B
+    # --------------------------------
+    if pose_state_b == 'lie_down':
+        bed_timer_b -= time.dt
+        if bed_timer_b <= 0:
+            play_actor_anim(sophie, 'sleep_idle', loop=True)
+            current_anim_b = 'sleep_idle'
+            pose_state_b = 'sleep_idle'
+            is_lying_b = True
+            log_event(
+                'sleep_idle_started',
+                'B is now lying on bed',
+                actor_id='B',
+                actor_entity=player_b,
+                room_name_override=current_room_b
+            )
+
+    elif pose_state_b == 'get_up_from_bed':
+        bed_timer_b -= time.dt
+        if bed_timer_b <= 0:
+            play_actor_anim(sophie, 'idle', loop=True)
+            current_anim_b = 'idle'
+            pose_state_b = 'idle'
+
+            if pending_bed_exit_pos_b is not None:
+                player_b.position = pending_bed_exit_pos_b
+                player_b.y = 0.85
+                sophie_root.position = Vec3(pending_bed_exit_pos_b.x, 0, pending_bed_exit_pos_b.z)
+                pending_bed_exit_pos_b = None
+
+            is_lying_b = False
+
+            log_event(
+                'get_up_from_bed_completed',
+                'B is now standing after getting up from bed',
+                actor_id='B',
+                actor_entity=player_b,
+                room_name_override=current_room_b
+            )
+
 
     # --------------------------------
     # sampled movement logging
@@ -3167,14 +3504,40 @@ def update():
     mid_z = (player_a.z + player_b.z) / 2
 
  
-    CAM_HEIGHT = 7.0      
-    CAM_OFFSET_Z = -5.5  
+    CAM_HEIGHT = 2.2      
+    CAM_OFFSET_Z = -2.2  
 
-    vision_cam_A.setPos(player_a.x, CAM_HEIGHT, player_a.z + CAM_OFFSET_Z)
-    vision_cam_A.lookAt(player_a.x, 1.0, player_a.z)
+def update_vision_cameras():
+    # YOLO için daha uygun: hafif üstten + önden/arkadan açılı kamera
+    # Amaç: kişi ve nesneler tepeden ezilmesin, hacimleri görünsün.
 
-    vision_cam_B.setPos(player_b.x, CAM_HEIGHT, player_b.z + CAM_OFFSET_Z)
-    vision_cam_B.lookAt(player_b.x, 1.0, player_b.z)
+    CAM_HEIGHT = 4.8
+    CAM_BACK_DISTANCE = 8.2
+    LOOK_HEIGHT = 1.2
+
+    # A kamerası: A aktörünün biraz arkasından ve yukarıdan bakar
+    vision_cam_A.setPos(
+        player_a.x,
+        CAM_HEIGHT,
+        player_a.z - CAM_BACK_DISTANCE
+    )
+    vision_cam_A.lookAt(
+        player_a.x,
+        LOOK_HEIGHT,
+        player_a.z
+    )
+
+    # B kamerası: B aktörünün biraz arkasından ve yukarıdan bakar
+    vision_cam_B.setPos(
+        player_b.x,
+        CAM_HEIGHT,
+        player_b.z - CAM_BACK_DISTANCE
+    )
+    vision_cam_B.lookAt(
+        player_b.x,
+        LOOK_HEIGHT,
+        player_b.z
+    )
 
     if held_keys['t']:
         print(f"A cam pos: {vision_cam_A.getPos()}")
