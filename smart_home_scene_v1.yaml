@@ -1,0 +1,22 @@
+path: datasets/smart_home_scene_v1
+train: images/train
+val: images/val
+
+nc: 15
+
+names:
+  0: person
+  1: couch
+  2: chair
+  3: table
+  4: bed
+  5: sink
+  6: toilet
+  7: bathtub
+  8: fridge
+  9: oven
+  10: door
+  11: lamp
+  12: plant
+  13: cabinet
+  14: drawer

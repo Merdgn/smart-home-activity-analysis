@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 import cv2
 
-model = YOLO("models/smart_home_person_object_v1_best.pt")
+model = YOLO("models/smart_home_scene_v1_best.pt")
 MODEL_LABELS = model.names
 
 LABEL_ALIASES = {
@@ -249,6 +249,21 @@ def filter_yolo_detections_by_room(results, room_name):
 
     return filtered
 
+def unique_detections_by_label(detections):
+    seen = set()
+    unique = []
+
+    for d in detections:
+        label = d['label']
+
+        if label in seen:
+            continue
+
+        unique.append(d)
+        seen.add(label)
+
+    return unique
+
 
 def infer_activity_from_state(actor_id, room_name, detected_labels):
     """
@@ -292,9 +307,9 @@ def infer_activity_from_state(actor_id, room_name, detected_labels):
             return 'using_coffee_machine'
         if toaster_device.is_on:
             return 'using_toaster'
-        if 'refrigerator' in detected_labels:
+        if 'fridge' in detected_labels:
             return 'near_refrigerator'
-        if 'dining table' in detected_labels or 'chair' in detected_labels:
+        if 'table' in detected_labels or 'chair' in detected_labels:
             return 'near_kitchen_table'
         return 'standing_in_kitchen'
 
@@ -302,7 +317,7 @@ def infer_activity_from_state(actor_id, room_name, detected_labels):
     if room_name == 'Living Room':
         if 'couch' in detected_labels:
             return 'near_couch'
-        if 'dining table' in detected_labels:
+        if 'table' in detected_labels:
             return 'near_living_table'
         return 'standing_in_living_room'
 
@@ -513,7 +528,7 @@ def save_vision_frame_for(actor_id, output_path, result_path, buffer):
         results = model.predict(
             source=str(output_path),
             imgsz=1280,
-            conf=0.20,
+            conf=0.15,
             iou=0.35,
             max_det=30,
         )
@@ -536,6 +551,8 @@ def save_vision_frame_for(actor_id, output_path, result_path, buffer):
 
 
         filtered_detections = filter_yolo_detections_by_room(results, actor_room)
+        filtered_detections = unique_detections_by_label(filtered_detections)
+
         print_filtered_detections(actor_id, actor_room, filtered_detections)
 
         detected_labels = [d['label'] for d in filtered_detections]
@@ -3230,7 +3247,7 @@ def update():
                 current_anim_b = 'idle'
 
 
-        # --------------------------------
+    # --------------------------------
     # bed animation flow A
     # --------------------------------
     if pose_state_a == 'lie_down':
@@ -3507,41 +3524,53 @@ def update():
     CAM_HEIGHT = 2.2      
     CAM_OFFSET_Z = -2.2  
 
+def setup_vision_camera(cam, actor_entity, room_name, is_lying=False):
+    x = actor_entity.x
+    z = actor_entity.z
+
+    if room_name == 'Kitchen':
+        cam.setPos(x, 4.6, z - 6.6)
+        cam.lookAt(x, 1.1, z)
+
+    elif room_name == 'Living Room':
+        cam.setPos(x + 2.2, 4.6, z - 5.2)
+        cam.lookAt(x, 1.0, z)
+
+    elif room_name == 'Bedroom':
+        if is_lying:
+            cam.setPos(x - 0.8, 5.4, z - 6.8)
+            cam.lookAt(x, 0.95, z)
+        else:
+            cam.setPos(x + 1.4, 4.8, z - 6.0)
+            cam.lookAt(x, 1.2, z)
+
+    elif room_name == 'Bathroom':
+        cam.setPos(x, 4.6, z - 5.4)
+        cam.lookAt(x, 1.2, z)
+
+    else:
+        cam.setPos(x, 4.8, z - 6.5)
+        cam.lookAt(x, 1.2, z)
+
+
 def update_vision_cameras():
-    # YOLO için daha uygun: hafif üstten + önden/arkadan açılı kamera
-    # Amaç: kişi ve nesneler tepeden ezilmesin, hacimleri görünsün.
-
-    CAM_HEIGHT = 4.8
-    CAM_BACK_DISTANCE = 8.2
-    LOOK_HEIGHT = 1.2
-
-    # A kamerası: A aktörünün biraz arkasından ve yukarıdan bakar
-    vision_cam_A.setPos(
-        player_a.x,
-        CAM_HEIGHT,
-        player_a.z - CAM_BACK_DISTANCE
-    )
-    vision_cam_A.lookAt(
-        player_a.x,
-        LOOK_HEIGHT,
-        player_a.z
+    setup_vision_camera(
+        vision_cam_A,
+        player_a,
+        current_room_a,
+        is_lying=is_lying_a
     )
 
-    # B kamerası: B aktörünün biraz arkasından ve yukarıdan bakar
-    vision_cam_B.setPos(
-        player_b.x,
-        CAM_HEIGHT,
-        player_b.z - CAM_BACK_DISTANCE
-    )
-    vision_cam_B.lookAt(
-        player_b.x,
-        LOOK_HEIGHT,
-        player_b.z
+    setup_vision_camera(
+        vision_cam_B,
+        player_b,
+        current_room_b,
+        is_lying=is_lying_b
     )
 
     if held_keys['t']:
-        print(f"A cam pos: {vision_cam_A.getPos()}")
-        print(f"B cam pos: {vision_cam_B.getPos()}")
+        print(f"A room: {current_room_a} | A cam pos: {vision_cam_A.getPos()}")
+        print(f"B room: {current_room_b} | B cam pos: {vision_cam_B.getPos()}")
 
 # --------------------------------------------------
 # STARTUP EVENTS

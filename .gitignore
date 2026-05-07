@@ -14,13 +14,20 @@ __pycache__/
 logs/
 *.log
 
-# YOLO weight file
+# YOLO base/pretrained weights
 yolov8n.pt
+
+# Ignore all pt files except final project model
 *.pt
+!models/
+!models/smart_home_scene_v1_best.pt
 
 # Temporary capture outputs
 assets/captures/
-assets/captures/yolo_output/
+
+# Training outputs and datasets
+runs/
+datasets/
 
 # OS / Editor
 .DS_Store
@@ -30,8 +37,3 @@ Thumbs.db
 
 # Optional local test/cache files
 *.tmp
-
-runs/
-logs/
-datasets/
-assets/captures/
